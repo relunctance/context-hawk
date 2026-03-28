@@ -1,151 +1,113 @@
-# 分层记忆系统 · Memory Layer System
+# 四层记忆架构 · Four-Tier Memory System
 
----
-
-## 设计原则
-
-**近因优先**：最近的记忆最容易被检索，权重最高。
-**按需加载**：不把所有文件都塞进上下文，只加载需要的。
-**可追溯**：历史内容不删除，只归档，备查。
+基于 memory-lancedb-pro 的 Weibull 衰减 + 三层晋升模型，增强为四层。
 
 ---
 
 ## 四层结构
 
-### Layer 1: today.md（每日新增）
-
-**内容**：今天的对话中产生的重要信息
-- 决策结论
-- 新发现
-- 用户偏好
-- 待办事项
-
-**格式**：
-```markdown
-## 2026-03-28
-
-### 决策
-- qujin-laravel-team Skill v2 已完成，推送 GitHub
-
-### 用户偏好
-- 老周喜欢简洁直接的回复
-
-### 待办
-- [ ] 飞书 agent 需要加载 qujingskills Skill
 ```
-
-**规则**：
-- 每次对话结束时自动追加
-- 不重复已记录内容
-- 超过 100 行时触发压缩提示
-
----
-
-### Layer 2: week.md（本周汇总）
-
-**内容**：周五自动从 today.md 合并本周重要内容
-- 本周关键决策
-- 项目里程碑
-- 重要变更
-
-**合并时机**：
-- 每周五（可配置）
-- 当 today.md 超过 200 行时强制合并
-
-**格式**：
-```markdown
-## 2026-W13 周汇总
-
-### 重要决策
-- 3/28: 确定 qujin-laravel-team Skill 架构（通用业务版）
-- 3/28: 覆盖率标准提升至 98%
-
-### 项目状态
-- qujingskills: 已发布 v1.0
-- feedback 模块: PR 已提交
-
-### 待处理
-- 飞书 agent 配置（待老周确认）
+┌─────────────────────────────────────────────────────┐
+│  Layer 0: Working Memory（工作记忆）                    │
+│  位置：内存 + LanceDB (working表)                     │
+│  内容：最近5-10轮对话、当前任务                         │
+│  上下文：完整注入                                      │
+│  衰减：1天后降至 Layer 1                              │
+│  晋升：access_count ≥ 5 → Layer 2                   │
+├─────────────────────────────────────────────────────┤
+│  Layer 1: Short-term Memory（短期记忆）                │
+│  位置：LanceDB (shortterm表)                         │
+│  内容：24小时对话、结构化摘要                           │
+│  衰减：半衰期30天，beta=1.0                          │
+│  晋升：access_count ≥ 10 + importance ≥ 0.7 → L2   │
+│  降级：decay_score < 0.15 → Layer 3                │
+├─────────────────────────────────────────────────────┤
+│  Layer 2: Long-term Memory（长期记忆）                 │
+│  位置：LanceDB (longterm表)                         │
+│  内容：importance ≥ 0.7 的知识/决策/规范              │
+│  衰减：半衰期90天，beta=0.6（最慢）                   │
+│  降级：超过90天未访问 → Layer 3                       │
+├─────────────────────────────────────────────────────┤
+│  Layer 3: Archive Memory（归档记忆）                   │
+│  位置：LanceDB (archive表)                          │
+│  内容：decay_score < 0.15 或 > 90天的记忆             │
+│  上下文：不主动加载                                    │
+│  召回：通过 memory_search 按需加载                      │
+└─────────────────────────────────────────────────────┘
 ```
 
 ---
 
-### Layer 3: month.md（月度归档）
+## Weibull 衰减公式
 
-**内容**：每月初从 week.md 合并上月里程碑
-- 月度成就
-- 重大架构决策
-- 团队规范变更
+```
+decay_score = exp(-(age_days / half_life) ^ beta)
 
-**格式**：
-```markdown
-# 2026-03 月度归档
+参数配置：
+| 层级 | 半衰期 | Beta | 说明 |
+|------|--------|------|------|
+| Working | 1天 | 0.8 | 快速衰减 |
+| Short-term | 30天 | 1.0 | 标准衰减 |
+| Long-term | 90天 | 0.6 | 缓慢衰减 |
+```
 
-## 重大决策
-- 3月: 建立趣近团队四 Agent 协作规范
+**复合衰减分** = (recency × 0.4) + (frequency × 0.3) + (importance × 0.3)
 
-## 项目里程碑
-- qujin-laravel-team Skill: v1.0 完成
-- feedback 模块: 后端完成，PR #1
+---
 
-## 规范沉淀
-- 四层架构：Controller→Logic→Dao→Model
-- 覆盖率标准：≥98%
+## 晋升规则
+
+```
+Working → Short-term
+  触发：24小时未访问
+  条件：decay_score > 0.5
+
+Short-term → Long-term
+  触发：access_count ≥ 10
+  条件：importance ≥ 0.7
+
+Any → Archive
+  触发1：decay_score < 0.15
+  触发2：超过90天未访问
 ```
 
 ---
 
-### Layer 4: archive/（历史归档）
-
-**内容**：超过30天的内容移动到这里
-- 不自动删除
-- 通过 `memory_search` 可检索
-- 不计入上下文
-
-**格式**：保留原始内容，不做修改
+## 记忆流向示意
 
 ```
-archive/
-├── 2026-02/          ← 按月份分子目录
-│   ├── week-1.md
-│   └── week-2.md
-└── 2026-01/
-    └── ...
+对话 → 自动提取 → Working → [访问] → Short-term → [频繁访问] → Long-term
+                   ↓ [30天]      ↓ [不访问]      ↓ [90天+]
+                Short-term    Archive        Archive
 ```
+
+---
+
+## 与 memory-lancedb-pro 的对应关系
+
+| context-hawk 层 | memory-lancedb-pro Tier | 说明 |
+|---------------|----------------------|------|
+| Working | Working | 活跃记忆 |
+| Short-term | Peripheral | 次活跃记忆 |
+| Long-term | Core | 高价值记忆 |
+| Archive | Archived | 已衰减记忆 |
 
 ---
 
 ## 启动加载规则
 
-每次启动（读取 BOOTSTRAP.md 时）：
+每次启动时：
 
-1. 读取 `memory/today.md`（今日）
-2. 读取 `memory/week.md`（本周）
-3. 检查 `memory/month.md` 是否存在
-4. **不自动加载** archive/ 内容（按需加载）
-5. 执行 `memory_search` 扫描 archive/ 时加载
-
----
-
-## 迁移现有 MEMORY.md
-
-如果已有 MEMORY.md，运行 `/hawk init` 会：
-
-1. 将现有 MEMORY.md 内容按日期标记归档到 `memory/month.md`
-2. 清空 MEMORY.md，写入指向新结构的说明
-3. 创建 `memory/today.md` 和 `memory/week.md`
+1. 加载 `memory/today.md`（今日文件层）
+2. 加载 `memory/week.md`（本周文件层）
+3. 从 Working Memory（LanceDB）加载 Top10
+4. 从 Short-term Memory 加载 importance Top5
+5. **不自动加载** Long-term 和 Archive（按需召回）
 
 ---
 
-## 与 memory_search 的关系
+## 迁移现有结构
 
-`memory_search` 语义搜索**所有层**，包括 archive/。
-
-搜索结果会标注来源：
-```
-[memory/today.md]  - 今天: 老周喜欢简洁回复
-[memory/week.md]   - 本周: qujin-laravel-team v2已完成
-[archive/2026-02/] - 历史: 团队规范v1
-```
-
-根据搜索结果，决定是否将 archive/ 内容晋升到更高层。
+旧的 `MEMORY.md` → Layer 2（Long-term）
+旧 `memory/today.md` → Layer 0（Working）
+旧 `memory/week.md` → Layer 1（Short-term）

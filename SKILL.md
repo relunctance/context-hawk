@@ -1,187 +1,202 @@
 ---
 name: context-hawk
 description: |
-  Context memory manager for AI agents. 当用户提到"记忆太大"、"MEMORY.md过大"、"上下文爆了"、"压缩记忆"、"分层记忆"、"memory管理"时激活。
+  Context-Hawk v2 — 上下文记忆守护者（增强版）。当用户提到"记忆太大"、"MEMORY管理"、"上下文压缩"、"分层记忆"、"lanceDB"、"memory-lancedb-pro"、"重要度评分"、"上下文注入策略"时激活。
   
-  功能：
-  (1) 分层记忆：today/week/month/archive 四层分流
-  (2) 自动压缩：多种策略（摘要/抽取/删除/晋升/归档）
-  (3) 报警系统：上下文超阈值时提醒，可开关
-  (4) 项目分流：按话题/项目拆分记忆文件
-  (5) CLI工具：context-hawk 命令行管理记忆
+  增强版新增：
+  (1) 融合 memory-lancedb-pro 的 LanceDB 向量记忆能力
+  (2) 四层架构（Working/Short/Long/Archive）+ Weibull衰减
+  (3) 结构化记忆（JSON格式，可检索可执行）
+  (4) 5种压缩策略 + 智能策略推荐
+  (5) 自动重要度评分（AI判断）
+  (6) 上下文注入策略（5种可切换）
+  (7) 自省机制（自动判断缺什么信息）
+  (8) 纯内存降级（无LanceDB时自动切换）
 
-  触发词：压缩记忆/MEMORY太大/记忆分流/上下文报警/分层记忆
+  触发词：压缩记忆/MEMORY太大/分层记忆/上下文报警/lanceDB/重要度/注入策略
 ---
 
-# Context-Hawk · 上下文守护者
+# Context-Hawk v2 🦅 — 上下文记忆守护者（增强版）
 
-AI 记忆的守门人。防止上下文膨胀、记忆混乱、检索困难。
+> 基于 memory-lancedb-pro 的 LanceDB 向量记忆能力 + context-hawk 的压缩策略 / 报警系统 / 分层管理。
+> 通用无业务侵入，可接入任意 Agent。
 
 ---
 
-## 核心能力
-
-### 1. 分层记忆（自动）
+## 核心架构
 
 ```
-MEMORY.md  ←─── 长期记忆（最终归档地）
-memory/
-├── today.md      ←─── 今日新增（每次对话追加）
-├── week.md       ←─── 本周摘要（周五自动合并）
-├── month.md      ←─── 本月里程碑（每月自动归档）
-└── archive/      ←─── 历史归档（可备查，不加载）
+┌─────────────────────────────────────────────────────────┐
+│  Working Memory（工作记忆）                                │
+│  - 最近5-10轮对话                                        │
+│  - 当前任务/目标                                         │
+│  - 完整注入上下文                                         │
+├─────────────────────────────────────────────────────────┤
+│  Short-term Memory（短期记忆）← LanceDB（Working表）      │
+│  - 24小时内内容                                         │
+│  - 结构化摘要，Weibull衰减                               │
+│  - 向量检索召回                                          │
+├─────────────────────────────────────────────────────────┤
+│  Long-term Memory（长期记忆）← LanceDB（Longterm表）      │
+│  - 永久保存，向量存储                                     │
+│  - 重要度 ≥ 0.7 自动晋升                                │
+│  - 跨会话知识沉淀                                        │
+├─────────────────────────────────────────────────────────┤
+│  Archive Memory（归档记忆）← LanceDB（Archive表）         │
+│  - 超90天 / Weibull衰减至接近0                           │
+│  - 压缩存储，不主动加载                                   │
+│  - memory_search 按需召回                                 │
+└─────────────────────────────────────────────────────────┘
 ```
-
-**启动规则**：每次启动只加载 `today.md` + `week.md` + `MEMORY.md`（如果存在）。
-
-**搜索规则**：使用 `memory_search` 语义搜索所有层，需要时加载 archive。
 
 ---
 
-### 2. 压缩策略（5种）
+## 结构化记忆格式
+
+每条记忆均为 JSON 结构，存入 LanceDB：
+
+```json
+{
+  "id": "mem_20260328_001",
+  "type": "task|knowledge|conversation|document|preference|decision",
+  "content": "完整内容",
+  "summary": "一句话摘要",
+  "importance": 0.85,
+  "confidence": 0.9,
+  "tier": "working|short|long|archive",
+  "category": "profile|preference|entity|event|case|pattern",
+  "created_at": "2026-03-28T10:00:00+08:00",
+  "last_accessed_at": "2026-03-28T10:00:00+08:00",
+  "access_count": 0,
+  "decay_score": 1.0,
+  "expires_at": null,
+  "metadata": {
+    "source": "conversation|document|extraction",
+    "scope": "global|project-name|agent-name",
+    "l0_abstract": "一句话概述",
+    "l1_overview": "段落摘要",
+    "l2_content": "完整内容"
+  }
+}
+```
+
+---
+
+## 重要度评分规则
+
+AI 自动为每条记忆打分（0.0 ~ 1.0）：
+
+| 分值 | 类型 | 说明 |
+|------|------|------|
+| 0.9-1.0 | 决策/规范/错误/产出 | 永久保留，Weibull衰减最慢 |
+| 0.7-0.9 | 任务/偏好/知识 | 长期记忆，晋升Long-term |
+| 0.4-0.7 | 对话/讨论/事实 | 短期记忆，衰减后归档 |
+| 0.0-0.4 | 闲聊/问候/废话 | 过滤，不存入 |
+
+**自动晋升规则**：
+- `access_count ≥ 10` + `importance ≥ 0.7` → 晋升 Core Long-term
+- `decay_score < 0.2` → 移入 Archive
+- 超过 `90天` → 强制 Archive
+
+---
+
+## Weibull 衰减模型
+
+基于 memory-lancedb-pro 的 Weibull 衰减：
+
+```
+decay_score = exp(-(age_days / half_life)^beta)
+```
+
+| 层级 | 半衰期 | Beta |
+|------|--------|------|
+| Working | 1天 | 0.8 |
+| Short-term | 30天 | 1.0 |
+| Long-term | 90天 | 0.6 |
+| Archive | - | - |
+
+---
+
+## 上下文注入策略（5种可切换）
+
+用户可随时切换，命令：`/hawk strategy <A|B|C|D|E>`
+
+| 策略 | 说明 | 适用场景 |
+|------|------|---------|
+| **A: 高重要度** | 只带 importance ≥ 0.7 的记忆 | 上下文非常紧张 |
+| **B: 任务相关** | 只带当前任务标签相关的记忆 | 专注开发 |
+| **C: 最近对话** | 只带最近 10 轮的记忆 | 快速迭代 |
+| **D: Top5 召回** | 长期记忆只召回 Top5 条 | 轻量模式 |
+| **E: 全部召回** | 无过滤，完整召回 | 深度分析 |
+
+**默认策略**：B（任务相关）
+
+---
+
+## 5种压缩策略
 
 | 策略 | 适用场景 | 效果 |
 |------|---------|------|
-| `summarize` | 过程冗长、结论清晰 | 500行 → 30行摘要 |
-| `extract` | 事实/决策/清单类内容 | 保留核心，删除噪声 |
-| `delete` | 临时/调试/过时内容 | 完全删除 |
-| `promote` | 值得保留的learnings | 晋升到对应项目文件 |
-| `archive` | 超过一个月的内容 | 移入 archive/，不改内容 |
+| `summarize` | 过程冗长、结论清晰 | 500行 → 30行 |
+| `extract` | 事实/决策/清单类 | 保留核心事实 |
+| `delete` | 临时/调试/过时 | 完全删除 |
+| `promote` | learnings类内容 | 聚合到主题文件 |
+| `archive` | 超过30天 | 移入archive表 |
+
+**压缩前必须确认**：全部 / 部分（用户选择行范围）
 
 ---
 
-### 3. 报警系统（可开关）
+## 自省机制
 
-- **默认阈值**：上下文超过 60% 时开启提示
-- **显示方式**：每次回答时附带 `[上下文: 63% / 80%]`
-- **开关命令**：
-  - 开启：`/hawk-alert on`
-  - 关闭：`/hawk-alert off`
-  - 设置阈值：`/hawk-alert set 70`
+每次回答前自动检查：
+
+```
+[Context-Hawk] 自省报告
+  任务明确度：✅ 明确
+  缺少信息：❌ 需求文档、❌ 技术方案
+  卡点检测：✅ 无
+  建议：补充 README.md 中的项目背景
+```
+
+自省判断：
+- 当前任务是否明确
+- 是否缺少需求/规范/步骤
+- 是否处于死循环/空转
+- 是否有未解决的阻塞
 
 ---
 
-### 4. 项目分流
+## 报警系统
 
-按话题/项目拆分成独立文件：
-
-```
-memory/
-├── qujingskills.md     ← Skill 研发相关
-├── 老周偏好.md          ← 沟通习惯、个人偏好
-├── 项目状态.md          ← 当前项目进度
-└── 团队规范.md          ← 四个 Agent 配置
-```
-
-所有文件通过 `memory_search` 统一检索，按需加载。
+- **默认阈值**：60% 开启提示，80% 严重报警
+- **显示**：`[🦅 Context: 63% / 80%]`
+- **开关**：`/hawk-alert on/off/set 70`
 
 ---
 
-## 使用方式
-
-### 初始化（首次使用）
+## LanceDB 降级方案
 
 ```
-/hawk init
-```
-
-创建完整目录结构，自动把现有 MEMORY.md 迁移到 `memory/month.md`。
-
----
-
-### 查看状态
-
-```
-/hawk status
-```
-
-输出：
-```
-[Context-Hawk] 上下文: 58% / 80%
-  today.md     12行  (今日新增)
-  week.md      34行  (本周汇总)
-  archive/      3文件 (不计入上下文)
-  memory/总行数  156行
+LanceDB 可用 → 持久化向量存储 + 混合检索
+LanceDB 不可用 → 纯内存模式（纯Python dict）
+功能完整度：100% → 90%（无向量检索，降级为全文搜索）
 ```
 
 ---
 
-### 压缩记忆
+## CLI 命令
 
-```
-/hawk compress          ← 交互式（选择策略和范围）
-/hawk compress summarize today.md   ← 对今日使用summarize策略
-/hawk compress all summarize        ← 对所有层使用summarize策略
-```
-
-**压缩前必须确认**：
-```
-[Context-Hawk] 确认压缩
-  范围：today.md (12行)
-  策略：summarize（摘要）
-  操作：保留结论，删除过程
-
-  选项：
-    [1] 全部压缩
-    [2] 只压缩某个部分（输入行范围，如 5-20）
-    [3] 取消
-
-  请选择 [1/2/3]：
-```
-
-用户选择后执行。如果用户选部分压缩，让用户输入具体行范围。
-
----
-
-### 报警开关
-
-```
-/hawk-alert on          ← 开启报警（默认60%阈值）
-/hawk-alert off         ← 关闭报警
-/hawk-alert set 70     ← 设置阈值为70%
-```
-
----
-
-### 项目分流
-
-```
-/hawk split             ← 交互式分流
-/hawk split --by-project   ← 按项目分
-/hawk split --by-topic     ← 按话题分
-```
-
----
-
-## 压缩策略选择指南
-
-**让 Agent 智能判断**：
-
-1. 读取目标文件内容
-2. 分析内容类型（过程/结论/事实/清单/临时）
-3. 推荐最优策略，给出理由
-4. 用户确认后执行
-
-**自动判断规则**：
-- 有"总结/结论/决定"关键词 → `summarize`
-- 有具体数值/日期/人名 → `extract`
-- 有"临时/temp/debug/测试" → `delete`
-- 有learnings/checklist类 → `promote`
-- 日期超过30天 → `archive`
-
----
-
-## 报警信息格式
-
-每次回答时附带（当上下文 > 阈值）：
-
-```
-[🦅 Context: 67% / 80%] 记忆较满，建议压缩 today.md（使用 summarize）
-```
-
-当上下文 > 80%：
-```
-[🦅⚠️ Context: 84% / 80%] 上下文紧张！请立即运行 /hawk compress
+```bash
+hawk init              # 初始化（含LanceDB初始化）
+hawk status           # 上下文状态 + LanceDB状态
+hawk compress         # 压缩（交互式策略选择）
+hawk compress today summarize  # 指定压缩
+hawk strategy A      # 切换注入策略
+hawk introspect      # 自省报告
+hawk search <query>  # 混合检索
+hawk alert on/off    # 报警开关
+hawk inject          # 手动触发上下文注入
 ```
 
 ---
@@ -190,24 +205,12 @@ memory/
 
 | 文档 | 用途 |
 |------|------|
-| [references/memory-system.md](references/memory-system.md) | 分层记忆完整说明 |
-| [references/compression-strategies.md](references/compression-strategies.md) | 5种压缩策略详解 |
-| [references/alerting.md](references/alerting.md) | 报警系统配置 |
-| [references/cli.md](references/cli.md) | CLI工具完整文档 |
+| [references/memory-system.md](references/memory-system.md) | 四层架构 + LanceDB集成 |
+| [references/structured-memory.md](references/structured-memory.md) | 结构化记忆格式 + 重要度规则 |
+| [references/injection-strategies.md](references/injection-strategies.md) | 5种注入策略详解 |
+| [references/compression-strategies.md](references/compression-strategies.md) | 5种压缩策略 |
+| [references/alerting.md](references/alerting.md) | 报警系统 |
+| [references/self-introspection.md](references/self-introspection.md) | 自省机制 |
+| [references/cli.md](references/cli.md) | CLI完整文档 |
+| [references/lancedb-integration.md](references/lancedb-integration.md) | LanceDB/memory-lancedb-pro集成 |
 | [references/split-patterns.md](references/split-patterns.md) | 项目分流模式 |
-
----
-
-## 初始文件
-
-Skill 初始化后，以下文件应已存在：
-
-```
-~/.openclaw/workspace/memory/
-├── today.md      （今日新增）
-├── week.md       （本周汇总）
-├── month.md      （本月里程碑）
-└── archive/     （历史归档目录）
-```
-
-如不存在，运行 `/hawk init` 初始化。

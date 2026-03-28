@@ -1,4 +1,4 @@
-# 项目分流模式 · Split Patterns
+# 项目分流模式 · Split Patterns v2
 
 ---
 
@@ -6,108 +6,94 @@
 
 ### 模式1: 按项目分流
 
-每个项目一个独立文件：
-
 ```
 memory/
 ├── qujingskills.md     ← qujin-laravel-team Skill 相关
-├── feedback.md        ← feedback 反馈模块
+├── feedback.md        ← feedback 模块
+├── context-hawk.md    ← context-hawk Skill
 ├── laravel.md         ← Laravel 框架学习
-└── 通用.md            ← 跨项目的通用内容
+└── 通用.md            ← 跨项目通用内容
 ```
 
-**适用场景**：多项目并行，每个项目有独立的里程碑和规范。
-
----
+**适用**：多项目并行，每个项目有独立里程碑。
 
 ### 模式2: 按话题分流
 
-按内容类型分流：
-
 ```
 memory/
-├── 团队规范.md         ← 四个 Agent 配置/协作规范
+├── 团队规范.md         ← Agent协作规范/配置
 ├── 用户偏好.md         ← 老周的沟通习惯/偏好
 ├── 项目状态.md         ← 当前所有项目的进度
-├── 技术积累.md         ← 学到的技术经验
-└── 待办事项.md         ← 跨项目的待办
+├── 技术积累.md         ← 学到的技术经验/learnings
+└── 待办事项.md         ← 跨项目待办
 ```
 
-**适用场景**：项目单一但内容多样，需要快速检索特定类型信息。
+**适用**：项目单一但内容多样，需要快速检索特定类型。
 
 ---
 
-## 分流规则
-
-### 判断标准
-
-| 内容类型 | → 分流到 |
-|---------|---------|
-| Skill研发/规范/文档 | `qujingskills.md` |
-| 具体项目进度/里程碑 | `项目状态.md` |
-| 老周的偏好/习惯/要求 | `用户偏好.md` |
-| 团队协作规范/Agent配置 | `团队规范.md` |
-| 技术经验/最佳实践 | `技术积累.md` |
-| 跨项目的TODO | `待办事项.md` |
-
-### 重复内容处理
-
-分流时发现重复记录：
-1. 保留最新一份
-2. 旧记录标记 `[已迁移至 xxx.md]`
-3. 汇总表记录迁移历史
-
----
-
-## 分流执行流程
+## 分流执行
 
 ```
-1. /hawk split --by-project
-2. 扫描所有记忆文件
-3. 识别内容主题（AI判断）
-4. 显示分流预览
-5. 用户确认
-6. 执行分流
-7. 更新 memory_search 索引
+/hawk split --by-project
+/hawk split --by-topic
+```
+
+交互流程：
+
+```
+[Context-Hawk] 分流模式：按项目
+
+  扫描 memory/ 目录...
+
+  识别到以下内容：
+  ┌──────────────────────────────────────────┐
+  │ qujingskills相关  23条  → qujingskills.md │
+  │ feedback相关       8条   → feedback.md    │
+  │ 其他               5条   → 通用.md       │
+  └──────────────────────────────────────────┘
+
+  [1] 全部确认分流
+  [2] 手动调整
+  [3] 取消
 ```
 
 ---
 
-## 晋升到更高层
+## 分流后的记忆结构
 
-分流后，内容仍可能被进一步晋升：
+分流后，所有记忆同时存在于：
+1. **分流文件**（human-readable）
+2. **LanceDB**（vector searchable）
 
-- `today.md` → `week.md`（周五合并）
-- `week.md` → `month.md`（每月归档）
-- `month.md` → `archive/`（超过3个月）
+两者保持同步。
 
 ---
 
-## 分流后的搜索
+## 与 LanceDB 的对应
 
-`memory_search` 跨所有分流文件检索：
-
-```
-[memory/qujingskills.md] - qujin-laravel-team Skill v2已完成
-[memory/项目状态.md]     - feedback PR#1等待review
-[memory/用户偏好.md]     - 老周喜欢简洁直接的回复
-```
+| 分流文件 | LanceDB 表 | 内容 |
+|---------|-----------|------|
+| qujingskills.md | longterm (scope=qujingskills) | Skill研发相关 |
+| 用户偏好.md | longterm (category=preference) | 用户偏好 |
+| 项目状态.md | shortterm (category=event) | 进度/里程碑 |
+| 技术积累.md | longterm (category=pattern) | 技术经验 |
+| 待办事项.md | working (category=task) | 任务 |
 
 ---
 
 ## 分流配置文件
 
-`.hawk-split-config` 记录分流规则：
-
+`.hawk-split-config`：
 ```json
 {
   "mode": "by-project",
   "files": {
-    "qujingskills.md": ["skill", "研发", "规范", "qujin"],
-    "feedback.md": ["feedback", "反馈", "pr"],
+    "qujingskills.md": ["skill", "研发", "规范", "agent"],
+    "feedback.md": ["feedback", "pr", "issue"],
     "laravel.md": ["laravel", "php", "框架"]
   },
   "default_file": "通用.md",
-  "last_split": "2026-03-28T12:00:00+08:00"
+  "last_split": "2026-03-29T00:00:00+08:00"
 }
 ```
