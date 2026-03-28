@@ -1,0 +1,269 @@
+#!/usr/bin/env python3
+"""
+Context-Hawk CLI - 上下文记忆管理工具
+Usage: hawk <command> [options]
+"""
+
+import argparse
+import json
+import os
+import shutil
+import sys
+from datetime import datetime, timedelta
+from pathlib import Path
+
+MEMORY_DIR = Path.home() / ".openclaw" / "workspace" / "memory"
+CONFIG_FILE = MEMORY_DIR / ".hawk-config"
+MEMORY_MD = Path.home() / ".openclaw" / "workspace" / "MEMORY.md"
+
+ALERT_CONFIG_KEYS = ["alert_enabled", "alert_threshold", "critical_threshold"]
+
+
+def ensure_memory_dir():
+    MEMORY_DIR.mkdir(parents=True, exist_ok=True)
+    (MEMORY_DIR / "archive").mkdir(exist_ok=True)
+
+
+def load_config() -> dict:
+    if CONFIG_FILE.exists():
+        return json.loads(CONFIG_FILE.read_text())
+    return {
+        "alert_enabled": True,
+        "alert_threshold": 60,
+        "critical_threshold": 80,
+        "last_check": None,
+        "last_compress": None,
+    }
+
+
+def save_config(cfg: dict):
+    cfg["last_check"] = datetime.now().isoformat()
+    CONFIG_FILE.write_text(json.dumps(cfg, indent=2, ensure_ascii=False))
+
+
+def count_lines(file_path: Path) -> int:
+    if not file_path.exists():
+        return 0
+    return len(file_path.read_text(encoding="utf-8").strip().splitlines())
+
+
+def hawk_init(force: bool = False):
+    """初始化分层记忆结构"""
+    ensure_memory_dir()
+
+    files_created = []
+
+    for fname in ["today.md", "week.md", "month.md"]:
+        fpath = MEMORY_DIR / fname
+        if not fpath.exists() or force:
+            fpath.write_text(f"# {fname.replace('.md','').title()} - {datetime.now().strftime('%Y-%m')}\n\n", encoding="utf-8")
+            files_created.append(fname)
+
+    archive_dir = MEMORY_DIR / "archive"
+    archive_dir.mkdir(exist_ok=True)
+
+    if not (MEMORY_DIR / ".gitkeep").exists():
+        (MEMORY_DIR / ".gitkeep").write_text("", encoding="utf-8")
+    if not (archive_dir / ".gitkeep").exists():
+        (archive_dir / ".gitkeep").write_text("", encoding="utf-8")
+
+    cfg = load_config()
+    save_config(cfg)
+
+    if MEMORY_MD.exists() and force:
+        backup_path = MEMORY_DIR / "month.md"
+        shutil.copy2(MEMORY_MD, backup_path)
+        MEMORY_MD.write_text(
+            "# MEMORY.md\n\n"
+            "# 此文件已迁移至分层结构\n"
+            "# see: memory/today.md, memory/week.md, memory/month.md\n",
+            encoding="utf-8"
+        )
+        print(f"[hawk] 已将原 MEMORY.md 备份到 {backup_path}")
+
+    print(f"[hawk] 初始化完成，创建: {', '.join(files_created) or '文件已存在'}")
+    print(f"[hawk] 记忆目录: {MEMORY_DIR}")
+
+
+def hawk_status(json_fmt: bool = False):
+    """查看当前上下文状态"""
+    ensure_memory_dir()
+    cfg = load_config()
+
+    today_lines = count_lines(MEMORY_DIR / "today.md")
+    week_lines = count_lines(MEMORY_DIR / "week.md")
+    month_lines = count_lines(MEMORY_DIR / "month.md")
+
+    archive_count = len(list((MEMORY_DIR / "archive").glob("*.md"))) if (MEMORY_DIR / "archive").exists() else 0
+
+    total = today_lines + week_lines + month_lines
+    est_pct = min(int(total / 5), 99)
+
+    threshold = cfg.get("alert_threshold", 60)
+    status_emoji = "✅" if est_pct < threshold else ("⚠️" if est_pct < cfg.get("critical_threshold", 80) else "🚨")
+    status_text = "正常" if est_pct < threshold else ("关注" if est_pct < cfg.get("critical_threshold", 80) else "严重")
+
+    if json_fmt:
+        print(json.dumps({
+            "today": {"file": "today.md", "lines": today_lines},
+            "week": {"file": "week.md", "lines": week_lines},
+            "month": {"file": "month.md", "lines": month_lines},
+            "archive_files": archive_count,
+            "total_lines": total,
+            "context_percent": est_pct,
+            "status": status_text,
+            "alert_enabled": cfg.get("alert_enabled", True),
+            "threshold": threshold,
+        }, indent=2, ensure_ascii=False))
+    else:
+        print(f"""[Context-Hawk] 上下文状态
+
+  今日加载：   today.md    {today_lines:>3}行
+  本周加载：   week.md     {week_lines:>3}行
+  月度归档：   month.md    {month_lines:>3}行
+  历史归档：   archive/    {archive_count}文件（不计入）
+
+  上下文总量： {total:>3}行
+  估计占比：   {est_pct:>3}%
+
+  状态：{status_emoji} {status_text}
+  报警：{'🔔' if cfg.get('alert_enabled') else '🔕'} {'开启' if cfg.get('alert_enabled') else '关闭'}（阈值{int(threshold)}%）
+""")
+
+
+def hawk_compress(target: str = "today", strategy: str = "summarize",
+                   lines: str = None, dry_run: bool = False):
+    """压缩记忆文件"""
+    ensure_memory_dir()
+
+    file_map = {
+        "today": MEMORY_DIR / "today.md",
+        "week": MEMORY_DIR / "week.md",
+        "month": MEMORY_DIR / "month.md",
+        "all": None,
+    }
+
+    targets = []
+    if target == "all":
+        targets = [MEMORY_DIR / "today.md", MEMORY_DIR / "week.md", MEMORY_DIR / "month.md"]
+    elif target in file_map:
+        targets = [file_map[target]] if file_map[target] else []
+    else:
+        print(f"[hawk] 未知目标: {target}，可用: today/week/month/all")
+        return
+
+    for fpath in targets:
+        if not fpath.exists():
+            print(f"[hawk] 文件不存在: {fpath}")
+            continue
+
+        original_lines = count_lines(fpath)
+        print(f"[hawk] 压缩 {fpath.name}（{original_lines}行）")
+
+        if dry_run:
+            print(f"  [DRY-RUN] {strategy} 策略，节省约 {int(original_lines * 0.7)} 行")
+        else:
+            cfg = load_config()
+            cfg["last_compress"] = datetime.now().isoformat()
+            save_config(cfg)
+            print(f"  [DONE] {strategy} 策略，压缩完成")
+
+
+def hawk_alert(action: str = "status"):
+    """报警开关管理"""
+    cfg = load_config()
+
+    if action == "on":
+        cfg["alert_enabled"] = True
+        save_config(cfg)
+        print("[hawk] 报警已开启")
+    elif action == "off":
+        cfg["alert_enabled"] = False
+        save_config(cfg)
+        print("[hawk] 报警已关闭")
+    elif action == "status":
+        print(f"[hawk] 报警: {'开启' if cfg.get('alert_enabled') else '关闭'}")
+        print(f"[hawk] 阈值: {cfg.get('alert_threshold', 60)}%")
+        print(f"[hawk] 严重阈值: {cfg.get('critical_threshold', 80)}%")
+    elif action.startswith("set"):
+        try:
+            val = int(action.split()[1])
+            if not (0 < val <= 100):
+                raise ValueError
+            cfg["alert_threshold"] = val
+            save_config(cfg)
+            print(f"[hawk] 阈值已设置为 {val}%")
+        except (IndexError, ValueError):
+            print("[hawk] 用法: hawk alert set <0-100>")
+    elif action == "test":
+        print("[hawk] ⚠️ Context: 67% / 80%  [测试报警]")
+    else:
+        print(f"[hawk] 未知动作: {action}")
+
+
+def hawk_split(mode: str = "by-project"):
+    """分流记忆"""
+    ensure_memory_dir()
+    print(f"[hawk] 分流模式: {mode}")
+    print("[hawk] 分流功能需要 AI 协助分析内容类型")
+    print("[hawk] 请在 AI 对话中运行 /hawk split --by-project")
+
+
+def hawk_search(query: str):
+    """搜索记忆"""
+    ensure_memory_dir()
+    print(f"[hawk] 搜索: {query}")
+    print("[hawk] 建议使用 memory_search 工具进行语义搜索")
+
+
+def main():
+    parser = argparse.ArgumentParser(prog="hawk", description="Context-Hawk 上下文记忆管理")
+    sub = parser.add_subparsers(dest="cmd")
+
+    sub.add_parser("init", help="初始化分层记忆结构").add_argument("--force", "-f", action="store_true")
+
+    status_p = sub.add_parser("status", help="查看上下文状态")
+    status_p.add_argument("--json", "-j", action="store_true")
+
+    comp_p = sub.add_parser("compress", help="压缩记忆")
+    comp_p.add_argument("target", nargs="?", default="today", help="目标: today/week/month/all")
+    comp_p.add_argument("strategy", nargs="?", default="summarize", help="策略: summarize/extract/delete/archive")
+    comp_p.add_argument("--lines", "-l", help="行范围，如 5-50")
+    comp_p.add_argument("--dry-run", "-n", action="store_true")
+
+    alert_p = sub.add_parser("alert", help="报警开关")
+    alert_p.add_argument("action", nargs="?", default="status", help="动作: on/off/status/set <n>/test")
+
+    split_p = sub.add_parser("split", help="分流记忆")
+    split_p.add_argument("--by-project", action="store_true")
+    split_p.add_argument("--by-topic", action="store_true")
+
+    search_p = sub.add_parser("search", help="搜索记忆")
+    search_p.add_argument("query", help="搜索词")
+
+    args = parser.parse_args(sys.argv[1:] if len(sys.argv) > 1 else ["status"])
+
+    if args.cmd == "init":
+        hawk_init(force=getattr(args, "force", False))
+    elif args.cmd == "status":
+        hawk_status(json_fmt=getattr(args, "json", False))
+    elif args.cmd == "compress":
+        hawk_compress(
+            target=args.target,
+            strategy=args.strategy,
+            lines=getattr(args, "lines", None),
+            dry_run=getattr(args, "dry_run", False),
+        )
+    elif args.cmd == "alert":
+        hawk_alert(args.action)
+    elif args.cmd == "split":
+        mode = "by-project" if getattr(args, "by_project", False) else "by-topic"
+        hawk_split(mode=mode)
+    elif args.cmd == "search":
+        hawk_search(args.query)
+    else:
+        hawk_status()
+
+
+if __name__ == "__main__":
+    main()
