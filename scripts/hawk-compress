@@ -1,0 +1,283 @@
+#!/usr/bin/env python3
+"""
+Context Compressor — Pure context compression engine.
+Compresses current conversation history into a clean, short prompt.
+No database, no dependencies, pure Python.
+"""
+
+import json
+import re
+import sys
+import os
+from datetime import datetime
+from typing import List, Dict, Optional
+
+MEMORY_DIR = os.path.expanduser("~/.openclaw/workspace/memory")
+
+
+# ─── Token Estimation ───────────────────────────────────────────────────────
+
+def estimate_tokens(text: str) -> int:
+    """粗略估算token数：中文约1.5字/token，英文约4字/token"""
+    if not text:
+        return 0
+    chinese = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')
+    ascii_chars = sum(1 for c in text if c.isascii())
+    return int(chinese / 1.5 + ascii_chars / 4)
+
+
+# ─── Importance Scoring ─────────────────────────────────────────────────────
+
+def score_importance(content: str) -> float:
+    """给消息打分 0.0 ~ 1.0"""
+    c = content.lower()
+
+    if any(k in c for k in ['决定:', '规则:', '架构:', '任务:', '规范:',
+                               '禁止:', '必须:', '重要:', '红线的', '❌']):
+        return 1.0
+
+    if any(k in c for k in ['代码:', '方案:', '设计:', '实现:', '修改:',
+                               '新增:', '完成:', 'skill', 'laravel', 'enum', 'dto']):
+        return 0.7
+
+    if any(k in c for k in ['讨论:', '说了', '觉得', '认为', '可能']):
+        return 0.4
+
+    if any(k in c for k in ['好的', '收到', 'ok', '嗯', '好', '谢谢',
+                               '请问', '抱歉', '对不起', '好的好的']):
+        return 0.1
+
+    return 0.5
+
+
+# ─── Compression Strategies ─────────────────────────────────────────────────
+
+def summarize_message(msg: Dict) -> Dict:
+    """将单条消息压缩为摘要"""
+    content = msg['content']
+    tokens = estimate_tokens(content)
+
+    if tokens < 150:
+        return {**msg, 'status': 'preserved'}
+
+    if '```' in content:
+        lines = content.count('\n') + 1
+        lang_match = re.search(r'```(\w+)', content)
+        lang = lang_match.group(1) if lang_match else ''
+        return {
+            **msg,
+            'content': f"[代码折叠: {lang} {lines}行]",
+            'status': 'collapsed'
+        }
+
+    sentences = [s.strip() for s in content.split('。') if s.strip()]
+    if len(sentences) <= 2:
+        return {**msg, 'status': 'preserved'}
+
+    core = '。'.join(sentences[:2])
+    return {
+        **msg,
+        'content': core + '。',
+        'status': 'summarized'
+    }
+
+
+def summarize_group(messages: List[Dict]) -> Dict:
+    """将一组消息压缩为一条摘要"""
+    user_msgs = [m for m in messages if m.get('role') == 'user']
+    assistant_msgs = [m for m in messages if m.get('role') == 'assistant']
+
+    parts = []
+    if user_msgs:
+        parts.append(f"User: {user_msgs[0]['content'][:100]}")
+    if assistant_msgs:
+        parts.append(f"Assistant: {assistant_msgs[0]['content'][:100]}")
+
+    return {
+        'role': 'summary',
+        'content': f"[{len(messages)}条消息摘要] " + ' | '.join(parts),
+        'status': 'summarized'
+    }
+
+
+def merge_duplicates(messages: List[Dict]) -> List[Dict]:
+    """合并连续重复的确认类消息"""
+    merged = []
+    skip_next = False
+    for i, msg in enumerate(messages):
+        if skip_next:
+            skip_next = False
+            continue
+        content = msg.get('content', '')
+        if any(k in content for k in ['好的', '收到', 'OK', '好的好的', '嗯嗯', '明白']):
+            if merged and merged[-1].get('role') == msg.get('role'):
+                if len(content) < 20:
+                    continue
+        merged.append(msg)
+    return merged
+
+
+def compress_light(dialog: List[Dict], keep_recent: int = 10) -> List[Dict]:
+    """轻度压缩：保留最近N条，其余摘要"""
+    recent = dialog[-keep_recent:]
+    older = [summarize_message(m) for m in dialog[:-keep_recent] if score_importance(m['content']) >= 0.4]
+    return older + recent
+
+
+def compress_normal(dialog: List[Dict], keep_recent: int = 10) -> List[Dict]:
+    """标准压缩：合并重复 + 摘要"""
+    merged = merge_duplicates(dialog)
+    recent = merged[-keep_recent:]
+    older = [summarize_message(m) for m in merged[:-keep_recent] if score_importance(m['content']) >= 0.4]
+    return older + recent
+
+
+def compress_heavy(dialog: List[Dict], keep_recent: int = 5) -> List[Dict]:
+    """重度压缩：只保留最近N条"""
+    recent = dialog[-keep_recent:]
+    older_msgs = dialog[:-keep_recent]
+    if older_msgs:
+        all_text = '\n'.join(m['content'][:200] for m in older_msgs[:10])
+        older = [{'role': 'summary', 'content': f"[早期{len(older_msgs)}条消息摘要] {all_text[:300]}", 'status': 'summarized'}]
+    else:
+        older = []
+    return older + recent
+
+
+def compress_emergency(dialog: List[Dict], keep_recent: int = 3) -> List[Dict]:
+    """紧急压缩：只保留最近3条"""
+    return dialog[-keep_recent:]
+
+
+# ─── Main Compressor ────────────────────────────────────────────────────────
+
+class ContextCompressor:
+    def __init__(
+        self,
+        max_tokens: int = 205000,
+        keep_recent: int = 10,
+        strategy: str = 'auto',
+        system_prompt: str = ''
+    ):
+        self.max_tokens = max_tokens
+        self.keep_recent = keep_recent
+        self.strategy = strategy
+        self.system_prompt = system_prompt
+
+    def compress(self, messages: List[Dict], level: str = 'auto') -> Dict:
+        """
+        压缩对话上下文，返回结构化JSON结果。
+        """
+        original_tokens = sum(estimate_tokens(m.get('content', '')) for m in messages)
+
+        # 分离系统提示
+        system = self.system_prompt
+        dialog = []
+        for msg in messages:
+            if msg.get('role') == 'system' and not self.system_prompt:
+                system = msg.get('content', '')
+            else:
+                dialog.append(msg)
+
+        # 自动选择压缩级别
+        if level == 'auto':
+            ratio = original_tokens / self.max_tokens if self.max_tokens else 1
+            if ratio >= 0.95:
+                level = 'emergency'
+            elif ratio >= 0.85:
+                level = 'heavy'
+            elif ratio >= 0.70:
+                level = 'normal'
+            else:
+                level = 'light'
+
+        # 执行压缩
+        if level == 'light':
+            compressed_dialog = compress_light(dialog, self.keep_recent)
+        elif level == 'normal':
+            compressed_dialog = compress_normal(dialog, self.keep_recent)
+        elif level == 'heavy':
+            compressed_dialog = compress_heavy(dialog, 5)
+        else:
+            compressed_dialog = compress_emergency(dialog, 3)
+
+        # 重组
+        result = []
+        if system:
+            result.append({'role': 'system', 'content': system, 'status': 'preserved'})
+        result.extend(compressed_dialog)
+
+        compressed_tokens = sum(estimate_tokens(m.get('content', '')) for m in result)
+        ratio_val = original_tokens / max(compressed_tokens, 1)
+
+        # 写入记忆
+        self._save_to_memory(original_tokens, compressed_tokens, level, messages)
+
+        return {
+            'status': 'success',
+            'compressed_prompt': result,
+            'stats': {
+                'original_tokens': original_tokens,
+                'compressed_tokens': compressed_tokens,
+                'ratio': f'{ratio_val:.1f}x',
+                'kept_messages': len([m for m in compressed_dialog if m.get('status') == 'preserved']),
+                'summarized_count': len([m for m in compressed_dialog if m.get('status') == 'summarized']),
+                'collapsed_count': len([m for m in compressed_dialog if m.get('status') == 'collapsed']),
+                'dropped_count': len(dialog) - len(compressed_dialog),
+                'level': level,
+                'system_prompt_preserved': bool(system)
+            },
+            'timestamp': datetime.now().isoformat()
+        }
+
+    def _save_to_memory(self, original: int, compressed: int, level: str, messages: List[Dict]):
+        """压缩后写入记忆文件"""
+        os.makedirs(MEMORY_DIR, exist_ok=True)
+        today = os.path.join(MEMORY_DIR, 'today.md')
+        entry = f"\n## {datetime.now().strftime('%Y-%m-%d %H:%M')} 压缩记录\n\n"
+        entry += f"- 原始: {original:,} tokens\n"
+        entry += f"- 压缩后: {compressed:,} tokens\n"
+        entry += f"- 压缩比: {original/max(compressed,1):.1f}x\n"
+        entry += f"- 级别: {level}\n\n"
+        with open(today, 'a', encoding='utf-8') as f:
+            f.write(entry)
+
+
+# ─── CLI Entry Point ────────────────────────────────────────────────────────
+
+def main():
+    import argparse
+    parser = argparse.ArgumentParser(description='Context Compressor')
+    parser.add_argument('--level', '-l', choices=['light', 'normal', 'heavy', 'emergency', 'auto'],
+                        default='auto', help='Compression level')
+    parser.add_argument('--keep', '-k', type=int, default=10,
+                        help='Number of recent messages to keep intact')
+    parser.add_argument('--input', '-i', help='Input JSON file')
+    parser.add_argument('--output', '-o', help='Output JSON file')
+    parser.add_argument('--dry-run', '-n', action='store_true',
+                        help='Preview without writing')
+    args = parser.parse_args()
+
+    # 读取输入
+    if args.input:
+        with open(args.input) as f:
+            messages = json.load(f)
+    else:
+        messages = json.load(sys.stdin)
+
+    compressor = ContextCompressor(keep_recent=args.keep)
+    result = compressor.compress(messages, level=args.level)
+
+    if args.dry_run:
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+    elif args.output:
+        with open(args.output, 'w') as f:
+            json.dump(result, f, indent=2, ensure_ascii=False)
+        stats = result['stats']
+        print(f"✅ Compressed: {stats['original_tokens']:,} → {stats['compressed_tokens']:,} tokens ({stats['ratio']})")
+    else:
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+
+
+if __name__ == '__main__':
+    main()
