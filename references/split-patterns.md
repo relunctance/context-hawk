@@ -1,99 +1,122 @@
-# 项目分流模式 · Split Patterns v2
+# Memory Split Patterns
 
 ---
 
-## 两种分流模式
+## Two Split Modes
 
-### 模式1: 按项目分流
+### Mode 1: By Project
 
 ```
 memory/
-├── qujingskills.md     ← qujin-laravel-team Skill 相关
-├── feedback.md        ← feedback 模块
+├── qujingskills.md     ← qujin-laravel-team Skill
+├── feedback.md        ← feedback module
 ├── context-hawk.md    ← context-hawk Skill
-├── laravel.md         ← Laravel 框架学习
-└── 通用.md            ← 跨项目通用内容
+├── laravel.md         ← Laravel framework learning
+└── general.md        ← Cross-project content
 ```
 
-**适用**：多项目并行，每个项目有独立里程碑。
+**Best for**: multi-project parallel work
 
-### 模式2: 按话题分流
+### Mode 2: By Topic
 
 ```
 memory/
-├── 团队规范.md         ← Agent协作规范/配置
-├── 用户偏好.md         ← 老周的沟通习惯/偏好
-├── 项目状态.md         ← 当前所有项目的进度
-├── 技术积累.md         ← 学到的技术经验/learnings
-└── 待办事项.md         ← 跨项目待办
+├── team-rules.md         ← Agent collaboration rules
+├── user-preferences.md   ← Communication preferences
+├── project-status.md     ← Current project progress
+├── tech-patterns.md     ← Technical learnings
+└── todo.md              ← Cross-project TODOs
 ```
 
-**适用**：项目单一但内容多样，需要快速检索特定类型。
+**Best for**: single project with diverse content types
 
 ---
 
-## 分流执行
+## Split Execution
+
+```bash
+hawk split --by-project
+hawk split --by-topic
+```
+
+Interactive flow:
 
 ```
-/hawk split --by-project
-/hawk split --by-topic
-```
+[Context-Hawk] Split mode: by-project
 
-交互流程：
+  Scanning memory/ directory...
 
-```
-[Context-Hawk] 分流模式：按项目
-
-  扫描 memory/ 目录...
-
-  识别到以下内容：
+  Identified:
   ┌──────────────────────────────────────────┐
-  │ qujingskills相关  23条  → qujingskills.md │
-  │ feedback相关       8条   → feedback.md    │
-  │ 其他               5条   → 通用.md       │
+  │ qujingskills  23 records → qujingskills.md │
+  │ feedback       8 records → feedback.md     │
+  │ other         5 records → general.md      │
   └──────────────────────────────────────────┘
 
-  [1] 全部确认分流
-  [2] 手动调整
-  [3] 取消
+  [1] Confirm all splits
+  [2] Manual adjustment
+  [3] Cancel
 ```
 
 ---
 
-## 分流后的记忆结构
+## Split Rules
 
-分流后，所有记忆同时存在于：
-1. **分流文件**（human-readable）
-2. **LanceDB**（vector searchable）
-
-两者保持同步。
-
----
-
-## 与 LanceDB 的对应
-
-| 分流文件 | LanceDB 表 | 内容 |
-|---------|-----------|------|
-| qujingskills.md | longterm (scope=qujingskills) | Skill研发相关 |
-| 用户偏好.md | longterm (category=preference) | 用户偏好 |
-| 项目状态.md | shortterm (category=event) | 进度/里程碑 |
-| 技术积累.md | longterm (category=pattern) | 技术经验 |
-| 待办事项.md | working (category=task) | 任务 |
+| Content type | → File |
+|-------------|--------|
+| Skill development/specs | `qujingskills.md` |
+| Specific project progress | `project-status.md` |
+| User preferences | `user-preferences.md` |
+| Team collaboration rules | `team-rules.md` |
+| Technical learnings/patterns | `tech-patterns.md` |
+| Cross-project TODOs | `todo.md` |
 
 ---
 
-## 分流配置文件
+## Deduplication on Split
 
-`.hawk-split-config`：
+When split finds duplicate records:
+1. Keep the newest
+2. Mark old record as `[migrated to xxx.md]`
+3. Log migration in summary table
+
+---
+
+## After Split — Memory Still Lives in LanceDB
+
+After splitting, all memories still exist in:
+1. **Split files** (human-readable)
+2. **LanceDB** (vector searchable)
+
+Both stay in sync.
+
+---
+
+## Split ↔ Memory Tier Relationship
+
+| Split file | LanceDB table | Content |
+|-----------|---------------|---------|
+| qujingskills.md | longterm (scope=qujingskills) | Skill-related |
+| user-preferences.md | longterm (category=preference) | User preferences |
+| project-status.md | shortterm (category=event) | Progress/milestones |
+| tech-patterns.md | longterm (category=pattern) | Technical experience |
+| todo.md | working (category=task) | Active tasks |
+
+---
+
+## Split Config File
+
+`.hawk-split-config`:
+
 ```json
 {
   "mode": "by-project",
   "files": {
-    "qujingskills.md": ["skill", "研发", "规范", "agent"],
+    "qujingskills.md": ["skill", "development", "specs", "agent"],
     "feedback.md": ["feedback", "pr", "issue"],
-    "laravel.md": ["laravel", "php", "框架"]
+    "laravel.md": ["laravel", "php", "framework"]
   },
-  "default_file": "通用.md",
+  "default_file": "general.md",
   "last_split": "2026-03-29T00:00:00+08:00"
 }
 ```

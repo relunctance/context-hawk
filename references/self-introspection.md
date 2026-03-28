@@ -1,135 +1,124 @@
-# 自省机制 · Self-Introspection
+# Self-Introspection
 
 ---
 
-## 核心能力
+## What It Does
 
-每次回答前，context-hawk 自动检查：
+Before every answer, Context-Hawk automatically checks:
 
-1. **任务明确度**：当前任务是否清晰？
-2. **信息完整性**：是否缺少必要信息？
-3. **卡点检测**：是否陷入死循环？
-4. **记忆对齐**：是否需要召回记忆来辅助？
+1. **Task clarity**: Is the current task clear?
+2. **Information completeness**: Any missing required info?
+3. **Context usage**: Is context near threshold?
+4. **Loop detection**: Am I stuck in a repetitive cycle?
+5. **Memory recall**: Should I recall relevant memories?
 
 ---
 
-## 自省检查清单
+## Introspection Checklist
 
 ```markdown
-[Context-Hawk] 自省检查
+[Context-Hawk] Introspection
 
-1. 任务明确度
-   ✅ 任务描述清晰
-   ⚠️  任务模糊，需要追问
-   ❌  任务不明确，已阻塞
+1. Task Clarity
+   ✅ Clear: "Complete the API documentation"
+   ⚠️  Vague: "Work on the project"
+   ❌  Unclear: task is blocked
 
-2. 信息完整性
-   ✅ 需求/规范/步骤齐全
-   ⚠️  缺少 [具体缺失项]
-   ❌  严重缺少信息
+2. Information Completeness
+   ✅ Complete: requirements/specs/rules available
+   ⚠️  Missing: [specific missing items]
+   ❌  Severely incomplete
 
-3. 上下文占用
-   📊 当前: 58% / 阈值: 80%
-   ✅ 上下文充足
-   ⚠️  上下文较满，建议压缩
+3. Context Usage
+   📊 Current: 41% / Threshold: 80%
+   ✅ Healthy: plenty of room
 
-4. 卡点检测
-   ✅ 无卡点
-   ⚠️  检测到重复失败，可能进入死循环
-   ❌  已死循环，需要干预
+4. Loop Detection
+   ✅ No loops detected
+   ⚠️  Repeated failure on same issue
+   ❌  Dead loop detected, intervention needed
 
-5. 记忆召回建议
-   💡 可召回相关记忆: 3条
-   📎 最近相关: "老周的沟通偏好"
+5. Memory Recall
+   💡 2 relevant memories available
+   📎 Recent: "user prefers concise responses"
 ```
 
 ---
 
-## 自省触发条件
+## Trigger Conditions
 
-| 触发条件 | 说明 |
-|---------|------|
-| 每次回答前（可选） | 低频，context < 40% |
-| 每次回答前（默认） | context 40-60% |
-| 每次回答前（强制） | context > 60% |
-| 用户提问时 | 检测到模糊/缺失信息 |
-| 连续重复失败 | 检测到死循环模式 |
+| Trigger | Condition |
+|---------|-----------|
+| Before every answer | context < 40% |
+| Before every answer | context 40-60% |
+| Before every answer | context > 60% |
+| On user question | detects vague/missing info |
+| On repeated failure | detects loop pattern |
 
 ---
 
-## 自省输出格式
+## Introspection Output Formats
 
-### 正常状态
+### Normal
 ```
-[🦅 自省] ✅ 状态正常
-  任务：完成 qujin-laravel-team Skill 文档
-  上下文：41%
-  建议：可继续
-```
-
-### 缺少信息
-```
-[🦅 自省] ⚠️ 缺少信息
-  任务：实现订单支付模块
-  缺少：
-    ❌ 支付接口文档（唐僧未出方案）
-    ❌ 第三方支付商户信息
-  建议：
-    → 向唐僧（架构师）请求技术方案
-    → 补充支付接口文档
+[🦅 Introspection] ✅ OK
+  Task: Complete API docs
+  Context: 41%
+  Suggestion: Continue
 ```
 
-### 上下文紧张
+### Missing Information
 ```
-[🦅 自省] 🔴 上下文紧张
-  当前：78% / 阈值：80%
-  最大块：today.md (156行)
-  建议：
+[🦅 Introspection] ⚠️ Missing info
+  Task: Implement payment module
+  Missing:
+    ❌ Payment interface spec (not designed yet)
+    ❌ Third-party merchant credentials
+  Suggestion:
+    → Request technical spec from architect
+    → Supply missing credentials
+```
+
+### Context High
+```
+[🦅 Introspection] 🔴 Context high
+  Current: 78% / Threshold: 80%
+  Largest: today.md (156 lines)
+  Suggestion:
     → /hawk compress today summarize
-    → /hawk strategy A（切换到高重要度模式）
+    → /hawk strategy A
 ```
 
-### 死循环检测
+### Loop Detection
 ```
-[🦅 自省] 🚨 死循环警告
-  检测：同一问题重复3次未解决
-  问题：Laravel事务写法
-  建议：
-    → 查看 memory-longterm 中的 "事务规范" 记忆
-    → 参考 qujin-laravel-team/constitution.md 第12条
+[🦅 Introspection] 🚨 Loop warning
+  Detected: Same issue repeated 3 times
+  Issue: Laravel transaction syntax
+  Suggestion:
+    → Check memory-longterm for "transaction" memories
+    → Reference constitution.md line 12
 ```
 
 ---
 
-## 自省配置
+## Commands
+
+```bash
+hawk introspect         # Immediate introspection
+hawk introspect --deep  # Deep introspection (includes memory recall test)
+hawk introspect --json  # JSON output
+```
+
+---
+
+## Configuration
 
 ```json
 {
   "introspection_enabled": true,
-  "introspection_interval": "every_answer",  // every_answer / on_demand
+  "introspection_interval": "every_answer",
   "loop_detection_threshold": 3,
   "info_gap_check": true,
   "context_threshold_forced_check": 60
 }
 ```
-
----
-
-## 自省命令
-
-```bash
-/hawk introspect        # 立即自省
-/hawk introspect --json  # JSON格式输出
-/hawk introspect --deep  # 深度自省（包含记忆召回测试）
-```
-
----
-
-## 与 memory-lancedb-pro 的协作
-
-自省使用 memory-lancedb-pro 的检索能力：
-
-1. 检测到任务模糊 → 从 Long-term 记忆召回相关知识
-2. 检测到缺少规范 → 从 Archive 记忆召回历史规范
-3. 检测到死循环 → 从 Case 记忆召回历史解决方案
-4. 检测到重复失败 → 触发 self-improvement 写入

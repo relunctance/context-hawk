@@ -28,7 +28,7 @@ Most AI agents suffer from **amnesia** — every new session starts from zero. C
 
 | # | Feature | Description |
 |---|---------|-------------|
-| 1 | **Task State Memory** | `hawk resume` — persist task state, resume after restart |
+| 1 | **Task State Persistence** | `hawk resume` — persist task state, resume after restart |
 | 2 | **4-Tier Memory** | Working → Short → Long → Archive with Weibull decay |
 | 3 | **Structured JSON** | Importance scoring (0-10), category, tier, L0/L1/L2 layers |
 | 4 | **AI Importance Scoring** | Auto-score memories, discard low-value content |
@@ -45,60 +45,51 @@ Most AI agents suffer from **amnesia** — every new session starts from zero. C
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                     Context-Hawk                              │
+│                      Context-Hawk                              │
 ├──────────────────────────────────────────────────────────────┤
 │                                                              │
-│  Working Memory  ←── Current session (last 5-10 turns)      │
+│  Working Memory  ←── Current session (recent 5-10 turns)       │
 │       ↓ Weibull decay                                        │
 │  Short-term      ←── 24h content, summarized                 │
 │       ↓ access_count ≥ 10 + importance ≥ 0.7                │
-│  Long-term       ←── Permanent knowledge, vector-indexed     │
+│  Long-term       ←── Permanent knowledge, vector-indexed      │
 │       ↓ >90 days or decay_score < 0.15                      │
-│  Archive          ←── Historical, loaded on-demand            │
+│  Archive          ←── Historical, loaded on-demand              │
 │                                                              │
 ├──────────────────────────────────────────────────────────────┤
-│  Task State Memory  ←── Persistent across restarts (key!)    │
-│  - Current task / next steps / progress / outputs / blockers │
+│  Task State Memory  ←── Persistent across restarts (key!)     │
+│  - Current task / next steps / progress / outputs           │
 ├──────────────────────────────────────────────────────────────┤
-│  Injection Engine  ←── Strategy A/B/C/D/E decides recall   │
-│  Self-Introspection ←── Checks every answer                  │
+│  Injection Engine  ←── Strategy A/B/C/D/E decides recall     │
+│  Self-Introspection ←── Every answer checks context         │
+│  Auto-Trigger       ←── Every 10 rounds (configurable)       │
 └──────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 📦 Task State Memory (Core Feature)
+## 📦 Task State Memory (Most Valuable Feature)
 
-**This is the most valuable feature.** Even after restart, power failure, or session switch, Context-Hawk resumes exactly where it left off.
+Even after restart, power failure, or session switch, Context-Hawk resumes exactly where it left off.
 
 ```json
 // memory/.hawk/task_state.jsonl
 {
   "task_id": "task_20260329_001",
-  "description": "Complete qujin-laravel-team Skill documentation",
+  "description": "Complete the API documentation",
   "status": "in_progress",
   "progress": 65,
-  "next_steps": [
-    "Review TangSeng's architecture template",
-    "Report to LaoZhou"
-  ],
-  "outputs": [
-    "SKILL.md",
-    "constitution.md",
-    "architect.md"
-  ],
-  "constraints": [
-    "Coverage must reach 98%",
-    "APIs must be versioned"
-  ],
+  "next_steps": ["Review architecture template", "Report to user"],
+  "outputs": ["SKILL.md", "constitution.md"],
+  "constraints": ["Coverage must reach 98%", "APIs must be versioned"],
   "resumed_count": 3
 }
 ```
 
 ```bash
 hawk task "Complete the documentation"  # Create task
-hawk task --step 1 done              # Mark step done
-hawk resume                           # Resume after restart ← CORE
+hawk task --step 1 done             # Mark step done
+hawk resume                           # Resume after restart ← CORE!
 ```
 
 ---
@@ -112,20 +103,21 @@ hawk resume                           # Resume after restart ← CORE
   "content": "Full original content",
   "summary": "One-line summary",
   "importance": 0.85,
-  "confidence": 0.9,
   "tier": "working|short|long|archive",
-  "category": "profile|preference|entity|event|case|pattern",
   "created_at": "2026-03-29T00:00:00+08:00",
   "access_count": 3,
-  "decay_score": 0.92,
-  "metadata": {
-    "l0_abstract": "One-line index",
-    "l1_overview": "Paragraph summary",
-    "l2_content": "Full content",
-    "scope": "global|project-name"
-  }
+  "decay_score": 0.92
 }
 ```
+
+### Importance Scoring
+
+| Score | Type | Action |
+|-------|------|--------|
+| 0.9-1.0 | Decisions/rules/errors | Permanent, slowest decay |
+| 0.7-0.9 | Tasks/preferences/knowledge | Long-term memory |
+| 0.4-0.7 | Dialog/discussion | Short-term, decay to archive |
+| 0.0-0.4 | Chat/greetings | **Discard, never store** |
 
 ---
 
@@ -136,31 +128,14 @@ hawk resume                           # Resume after restart ← CORE
 | **A: High-Importance** | `importance ≥ 0.7` | 60-70% |
 | **B: Task-Related** | scope match | 30-40% ← default |
 | **C: Recent** | last 10 turns | 50% |
-| **D: Top5 Recall** | `access_count` Top5 | 70% |
+| **D: Top5 Recall** | `access_count` top 5 | 70% |
 | **E: Full** | no filter | 100% |
-
-```bash
-hawk strategy A   # High-importance mode
-hawk strategy B   # Task-related (default)
-hawk strategy     # View current
-```
 
 ---
 
 ## 🗜️ 5 Compression Strategies
 
-| Strategy | Best For | Effect |
-|----------|----------|--------|
-| `summarize` | Long process, clear conclusion | 500 lines → 30 |
-| `extract` | Facts/decisions/lists | Keep core facts |
-| `delete` | Temp/debug/outdated | Full delete |
-| `promote` | learnings | Aggregate to topic file |
-| `archive` | >30 days | Move to archive layer |
-
-```bash
-hawk compress today summarize     # Compress today.md
-hawk compress                    # Interactive (confirm before any action)
-```
+`summarize` · `extract` · `delete` · `promote` · `archive`
 
 ---
 
@@ -168,77 +143,75 @@ hawk compress                    # Interactive (confirm before any action)
 
 | Level | Threshold | Action |
 |-------|-----------|--------|
-| ✅ Normal | < 60% | No alert |
+| ✅ Normal | < 60% | Silent |
 | 🟡 Watch | 60-79% | Suggest compression |
-| 🔴 Critical | 80-94% | Pause auto-write, force suggest |
+| 🔴 Critical | 80-94% | Pause auto-write, force suggestion |
 | 🚨 Danger | ≥ 95% | Block writes, must compress |
-
-```bash
-hawk alert on    # Enable alerts
-hawk alert off   # Disable
-hawk alert set 70  # Set threshold
-```
 
 ---
 
 ## 🚀 Quick Start
 
 ```bash
-# 1. Install LanceDB plugin (recommended)
+# Install LanceDB plugin (recommended)
 openclaw plugins install memory-lancedb-pro@beta
 
-# 2. Activate skill
+# Activate skill
 openclaw skills install ./context-hawk.skill
 
-# 3. Initialize
+# Initialize
 hawk init
 
-# 4. Start a task
-hawk task "Complete the API documentation"
-
-# 5. Resume after restart
-hawk resume
+# Core commands
+hawk task "My task"    # Create task
+hawk resume             # Resume last task ← MOST IMPORTANT
+hawk status            # View context usage
+hawk compress          # Compress memory
+hawk strategy B        # Switch to task-related mode
+hawk introspect         # Self-introspection report
 ```
 
 ---
 
-## CLI Commands
+## Auto-Trigger: Every N Rounds
+
+Every **10 rounds** (default, configurable), Context-Hawk automatically:
+
+1. Checks context water level
+2. Evaluates memory importance
+3. Reports status to user
+4. Suggests compression if needed
 
 ```bash
-hawk init              # Initialize memory structure
-hawk status           # View context usage
-hawk task ["desc"]   # Create/manage task
-hawk resume          # Resume last task ← most important!
-hawk compress        # Compress memory (interactive)
-hawk strategy [A-E] # Switch injection strategy
-hawk introspect      # Self-introspection report
-hawk search <query> # Hybrid search (vector + full-text)
-hawk alert on|off    # Toggle alerts
-hawk backup          # Backup LanceDB
+# Config (in memory/.hawk/config.json)
+{
+  "auto_check_rounds": 10,          # check every N rounds
+  "keep_recent": 5,                 # preserve last N turns
+  "auto_compress_threshold": 70      # compress when > 70%
+}
 ```
 
 ---
 
-## 📂 File Structure
+## File Structure
 
 ```
 context-hawk/
 ├── SKILL.md
-├── README.md              # English (default)
-├── README_zh.md           # 中文（中文版）
+├── README.md
 ├── LICENSE
 ├── scripts/
 │   └── hawk               # Python CLI tool
 └── references/
     ├── memory-system.md           # 4-tier architecture
     ├── structured-memory.md      # Memory format & importance
-    ├── task-state.md            # Task state persistence
-    ├── injection-strategies.md   # 5 injection strategies
-    ├── compression-strategies.md  # 5 compression strategies
-    ├── alerting.md              # Alert system
-    ├── self-introspection.md    # Self-introspection
-    ├── lancedb-integration.md   # LanceDB integration
-    └── cli.md                   # CLI documentation
+    ├── task-state.md           # Task state persistence
+    ├── injection-strategies.md  # 5 injection strategies
+    ├── compression-strategies.md # 5 compression strategies
+    ├── alerting.md             # Alert system
+    ├── self-introspection.md   # Self-introspection
+    ├── lancedb-integration.md  # LanceDB integration
+    └── cli.md                  # CLI reference
 ```
 
 ---

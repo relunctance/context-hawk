@@ -1,139 +1,139 @@
-# 上下文注入策略 · Context Injection Strategies
+# Context Injection Strategies
 
 ---
 
-## 策略概览
+## Overview
 
-当前上下文 = `today.md` + `week.md` + `注入记忆`
+Context = `today.md` + `week.md` + `injected memories`
 
-注入记忆由策略决定，不同策略下召回的记忆不同。
-
----
-
-## 策略 A：高重要度模式
-
-**触发**：`/hawk strategy A`
-
-**逻辑**：只注入 `importance ≥ 0.7` 的记忆
-
-```
-适用：上下文极度紧张（>80%）
-效果：节省约 60-70% token
-```
-
-注入内容示例：
-```
-[重要记忆]
-- 老周的沟通偏好：简洁直接，不喜欢废话 (importance: 0.9)
-- 四层架构红线：Controller→Logic→Dao→Model，禁止跨层 (importance: 0.95)
-- 测试覆盖率标准：≥ 98% (importance: 0.9)
-```
+Injected memories are controlled by the active strategy.
 
 ---
 
-## 策略 B：任务相关模式（默认）
+## Strategy A: High-Importance
 
-**触发**：`/hawk strategy B`
+**Trigger**: `/hawk strategy A`
 
-**逻辑**：只注入 `metadata.scope` 或 `metadata.tags` 与当前任务匹配的记忆
+**Logic**: Inject only memories with `importance ≥ 0.7`
 
 ```
-适用：日常开发迭代
-效果：节省约 30-40% token
+Use when: context is extremely tight (>80%)
+Saves: 60-70% token
 ```
 
-注入内容示例：
+Injected:
 ```
-[任务相关记忆]
-- 当前项目：qujin-laravel-team
-- 相关记忆：
-  * 电商模块DAO查询模式已完成 (task: qujin-laravel-team)
-  * 白龙反馈：覆盖率需达98% (task: qujin-laravel-team)
+[Important memories]
+- User communication preferences: concise (importance: 0.9)
+- Four-layer architecture rule: Controller→Logic→Dao→Model (importance: 0.95)
+- Coverage standard: ≥ 98% (importance: 0.9)
 ```
 
 ---
 
-## 策略 C：最近对话模式
+## Strategy B: Task-Related (default)
 
-**触发**：`/hawk strategy C`
+**Trigger**: `/hawk strategy B`
 
-**逻辑**：只注入最近 10 轮对话中产生的记忆，按时间倒序
-
-```
-适用：快速迭代、短期任务
-效果：节省约 50% token
-```
-
----
-
-## 策略 D：Top5 召回模式
-
-**触发**：`/hawk strategy D`
-
-**逻辑**：长期记忆只召回 `access_count` 最高的 5 条
+**Logic**: Inject only memories where `metadata.scope` or `metadata.tags` match current task
 
 ```
-适用：上下文轻量模式
-效果：节省约 70% token
+Use when: normal development iteration
+Saves: 30-40% token
+```
+
+Injected:
+```
+[Task-related memories]
+- Current project: qujin-laravel-team
+- Related memories:
+  * E-commerce DAO query patterns completed (task: qujin-laravel-team)
+  * Coverage feedback: need 98% (task: qujin-laravel-team)
 ```
 
 ---
 
-## 策略 E：全部召回模式
+## Strategy C: Recent-Conversation
 
-**触发**：`/hawk strategy E`
+**Trigger**: `/hawk strategy C`
 
-**逻辑**：不过滤，全部召回（向量相似度 Top20）
+**Logic**: Inject only memories from the last 10 conversation turns
 
 ```
-适用：深度分析、代码审查
-注意：上下文占用大，不建议日常使用
+Use when: short-term fast iteration
+Saves: 50% token
 ```
 
 ---
 
-## 策略切换命令
+## Strategy D: Top5 Recall
+
+**Trigger**: `/hawk strategy D`
+
+**Logic**: Long-term memory — only recall Top 5 by `access_count`
+
+```
+Use when: lightweight context mode
+Saves: 70% token
+```
+
+---
+
+## Strategy E: Full Recall
+
+**Trigger**: `/hawk strategy E`
+
+**Logic**: No filter, recall all (vector similarity Top 20)
+
+```
+Use when: deep analysis, code review
+Warning: high token usage
+```
+
+---
+
+## Switching Commands
 
 ```bash
-/hawk strategy A     # 高重要度
-/hawk strategy B     # 任务相关（默认）
-/hawk strategy C     # 最近对话
-/hawk strategy D     # Top5召回
-/hawk strategy E     # 全部召回
-/hawk strategy       # 查看当前策略
+hawk strategy A     # High-importance
+hawk strategy B     # Task-related (default)
+hawk strategy C     # Recent conversation
+hawk strategy D     # Top5 recall
+hawk strategy E     # Full recall
+hawk strategy       # View current strategy
 ```
 
 ---
 
-## 动态注入流程
+## Forced Injections (not affected by strategy)
 
-每次回答前：
+These always inject regardless of strategy:
+
+- Current task description (`type: task`)
+- User preferences with `importance ≥ 0.8`
+- Team rules/decisions with `importance ≥ 0.9`
+
+---
+
+## Dynamic Injection Flow
+
+Before every answer:
 
 ```
-1. 获取当前上下文量
-2. 检查当前策略
-3. 按策略从 LanceDB 召回记忆
-4. 合并到上下文
-5. 如果超过阈值 → 提示压缩
+1. Get current context level
+2. Check active strategy
+3. Recall memories from LanceDB by strategy rules
+4. Merge into context
+5. If exceeds threshold → trigger compression suggestion
 ```
 
 ---
 
-## 强制注入（不受策略影响）
+## Noise Filtering
 
-以下类型不受策略限制，强制注入：
+These do NOT enter memory:
 
-- 当前任务描述（task）
-- 用户明确指定的偏好（preference importance ≥ 0.8）
-- 团队红线/规范（decision importance ≥ 0.9）
-
----
-
-## 噪声过滤
-
-以下内容不存入记忆：
-
-- 问候语（"你好"/"Hi"）
-- 重复确认（"好的"/"OK"/"收到"）
-- 调试日志
-- 平台信封元数据（sender_id/message_id等）
+- Greetings ("hello", "hi")
+- Repeated confirmations ("ok", "yes", "got it")
+- Debug logs
+- Platform envelope metadata (sender_id, message_id, etc.)

@@ -1,26 +1,26 @@
-# LanceDB 集成 · memory-lancedb-pro Integration
+# LanceDB Integration
 
 ---
 
-## 架构概览
+## Architecture Overview
 
 ```
-context-hawk
-     ↓ 调用
-memory-lancedb-pro（ LanceDB 向量库）
-     ↓ 存储
+context-hawk (Agent layer)
+     ↓ calls
+memory-lancedb-pro (LanceDB vector library)
+     ↓ stores
 ~/.openclaw/memory-lancedb/
-     ├── working.lance     (工作记忆)
-     ├── shortterm.lance  (短期记忆)
-     ├── longterm.lance   (长期记忆)
-     └── archive.lance    (归档记忆)
+     ├── working.lance     (working memories)
+     ├── shortterm.lance  (short-term memories)
+     ├── longterm.lance   (long-term memories)
+     └── archive.lance    (archived memories)
 ```
 
 ---
 
-## 安装 memory-lancedb-pro
+## Installing memory-lancedb-pro
 
-### 方式一：openclaw CLI（推荐）
+### Option A: openclaw CLI (recommended)
 
 ```bash
 openclaw plugins install memory-lancedb-pro@beta
@@ -28,13 +28,13 @@ openclaw config validate
 openclaw gateway restart
 ```
 
-### 方式二：npm
+### Option B: npm
 
 ```bash
 npm i memory-lancedb-pro@beta
 ```
 
-然后在 `openclaw.json` 中配置：
+Then add to `openclaw.json`:
 
 ```json
 {
@@ -63,91 +63,88 @@ npm i memory-lancedb-pro@beta
 
 ---
 
-## context-hawk 与 memory-lancedb-pro 的协作
+## How context-hawk Uses memory-lancedb-pro
 
 ```
-context-hawk（Agent层）
-  ├─ /hawk compress     → 触发 memory-lancedb-pro 的压缩/归档
-  ├─ /hawk strategy    → 控制 memory-lancedb-pro 的召回策略
-  ├─ /hawk introspect  → 使用 memory-lancedb-pro 的自省能力
-  └─ /hawk status      → 显示四层记忆状态
+context-hawk (Agent layer)
+  ├─ /hawk compress     → triggers memory-lancedb-pro compression/archive
+  ├─ /hawk strategy    → controls memory-lancedb-pro recall strategy
+  ├─ /hawk introspect  → uses memory-lancedb-pro retrieval for self-check
+  └─ /hawk status      → displays four-tier memory status
 
-memory-lancedb-pro（存储层）
-  ├─ 向量检索（Vector Search）
-  ├─ BM25全文检索
-  ├─ Weibull衰减
-  ├─ 自动提取（Smart Extraction）
-  └─ 三层晋升（Peripheral ↔ Working ↔ Core）
+memory-lancedb-pro (Storage layer)
+  ├─ Vector search
+  ├─ BM25 full-text search
+  ├─ Weibull decay
+  ├─ Smart extraction
+  └─ Three-tier promotion (Peripheral ↔ Working ↔ Core)
 ```
 
 ---
 
-## 配置项对照
+## Config Mapping
 
-| context-hawk 配置 | memory-lancedb-pro 配置 | 说明 |
-|-----------------|------------------------|------|
-| 分层阈值 30天 | `decay.recencyHalfLifeDays: 30` | 短期记忆半衰期 |
-| 分层阈值 90天 | `tier.peripheralAgeDays: 90` | 归档阈值 |
-| 重要度阈值 0.7 | `tier.coreAccessThreshold: 10` | 晋升阈值 |
-| 报警阈值 60% | - | context-hawk 独立配置 |
-| Beta 衰减参数 | `decay.betaCore/Working/Peripheral` | 各层衰减参数 |
-
----
-
-## 降级模式
-
-当 memory-lancedb-pro 不可用时，context-hawk 自动切换到纯文件模式：
-
-```
-LanceDB 可用
-  → 四层分层 + 向量检索 + Weibull衰减
-
-LanceDB 不可用
-  → memory/ 目录结构（today/week/month/archive）
-  → 全文搜索（grep）
-  → 手动衰减（无自动）
-  → 覆盖率：90%（功能完整度）
-```
-
-降级后，所有 `/hawk` 命令正常工作，只是检索能力从向量搜索降级为关键词搜索。
+| context-hawk config | memory-lancedb-pro config | Description |
+|-------------------|------------------------|-------------|
+| 30-day layer threshold | `decay.recencyHalfLifeDays: 30` | Short-term half-life |
+| 90-day archive threshold | `tier.peripheralAgeDays: 90` | Archive threshold |
+| importance ≥ 0.7 promotion | `tier.coreAccessThreshold: 10` | Promotion threshold |
+| 60% alert threshold | (independent) | context-hawk alert config |
 
 ---
 
-## 手动触发提取
+## Graceful Degradation
 
-当 memory-lancedb-pro 安装后，对话会自动触发提取。也可以手动触发：
+```
+LanceDB available
+  → Four-tier layering + vector search + Weibull decay
+
+LanceDB unavailable
+  → memory/ directory structure (today/week/month/archive)
+  → Full-text search (grep)
+  → Manual decay (no auto)
+  → Feature coverage: 90%
+```
+
+All `/hawk` commands work normally without LanceDB — only vector search degrades to keyword search.
+
+---
+
+## Manual Extraction
+
+With memory-lancedb-pro installed, extraction is automatic per conversation. Can also trigger manually:
 
 ```bash
-hawk extract --force    # 强制提取当前对话
-hawk extract --dry-run  # 预览提取结果，不存入
+hawk extract --force    # Force extract current conversation
+hawk extract --dry-run  # Preview extraction, don't persist
 ```
 
 ---
 
-## 召回测试
+## Recall Testing
 
 ```bash
-hawk recall "老周的沟通偏好"   # 测试召回
-hawk recall "四层架构规范"    # 测试召回
-hawk verify                    # 验证记忆一致性
+hawk recall "user communication preferences"   # Test recall
+hawk recall "four-layer architecture"          # Test recall
+hawk verify                    # Verify memory consistency
 ```
 
 ---
 
-## 备份与导出
+## Backup & Export
 
 ```bash
-hawk backup               # 备份 LanceDB 到压缩文件
-hawk export --json       # 导出为 JSON
-hawk import backup.zip   # 从备份恢复
+hawk backup               # Backup LanceDB to compressed file
+hawk export --json       # Export memories as JSON
+hawk import backup.zip  # Restore from backup
 ```
 
 ---
 
-## 环境变量
+## Environment Variables
 
-| 变量 | 说明 |
-|------|------|
-| `OPENAI_API_KEY` | 向量嵌入 API（可替换为 Jina/Gemini/Ollama） |
-| `MEMORY_LANCEDB_DIR` | LanceDB 数据目录（默认 ~/.openclaw/memory-lancedb/） |
-| `MEMORY_SCOPE` | 当前作用域（如项目名） |
+| Variable | Description |
+|----------|-------------|
+| `OPENAI_API_KEY` | Vector embedding API (can be Jina/Gemini/Ollama) |
+| `MEMORY_LANCEDB_DIR` | LanceDB data dir (default: ~/.openclaw/memory-lancedb/) |
+| `MEMORY_SCOPE` | Current scope (e.g., project name) |
