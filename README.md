@@ -1,119 +1,167 @@
-# Context-Hawk 🦅
+# 🦅 Context-Hawk
 
-> AI 上下文记忆守护者 — 分层记忆 / 自动压缩 / 报警系统 / 项目分流
+> **AI Context Memory Guardian** — Stop losing track, start remembering what matters.
 
-**"上下文太满？让鹰来帮你盯着。"**
+*Give any AI agent a memory that actually works — across sessions, across topics, across time.*
 
----
-
-## 核心功能
-
-### 🗂️ 分层记忆
-```
-memory/
-├── today.md      ← 今日新增（每次对话追加）
-├── week.md       ← 本周汇总（周五自动合并）
-├── month.md      ← 月度归档（每月归档）
-└── archive/     ← 历史归档（不计入上下文）
-```
-启动只加载 `today.md + week.md`，`memory_search` 跨层检索。
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![OpenClaw Compatible](https://img.shields.io/badge/OpenClaw-2026.3%2B-brightgreen)](https://github.com/openclaw/openclaw)
 
 ---
 
-### 🗜️ 5种压缩策略
+## What does it do?
 
-| 策略 | 适用场景 | 效果 |
-|------|---------|------|
-| `summarize` | 过程冗长、结论清晰 | 500行 → 30行 |
-| `extract` | 事实/决策/清单类 | 保留核心 |
-| `delete` | 临时/调试/过时内容 | 完全删除 |
-| `promote` | learnings 类内容 | 聚合到主题文件 |
-| `archive` | 超过30天 | 移入 archive/ |
+Most AI agents suffer from **amnesia** — every new session starts from zero. Context-Hawk solves this with a production-grade memory management system that automatically captures what matters, lets noise fade away, and recalls the right memory at the right time.
+
+**Without Context-Hawk:**
+> "I already told you — I prefer concise replies!"
+> (next session, the agent forgets again)
+
+**With Context-Hawk:**
+> (silently applies your communication preferences from session 1)
+> ✅ Delivers concise, direct response every time
 
 ---
 
-### 🔔 报警系统
+## ✨ Features
 
-上下文超阈值时，每次回答附带提示：
+### 🗂️ Four-Tier Memory Architecture
 ```
-[🦅 Context: 67% / 80%] 记忆较满，建议压缩 today.md
+Working → Short-term → Long-term → Archive
 ```
+Automatic Weibull decay — important memories stay, noise fades naturally. Powered by LanceDB vector storage.
 
-开关命令：
+### 🧠 Structured Memory
+Every memory is a structured JSON record with:
+- **Importance score** (0.0-1.0) — AI auto-scored
+- **Category** (task/knowledge/preference/decision)
+- **Tier** (working/short/long/archive)
+- **L0/L1/L2 layers** (index/summary/full)
+
+### 🎯 Smart Context Injection
+5 switchable strategies — pick how much memory enters the context:
+| Strategy | Best for |
+|----------|---------|
+| **A: High-importance** | Critical context limits |
+| **B: Task-related** | Focused development (default) |
+| **C: Recent conversation** | Fast iteration |
+| **D: Top5 recall** | Lightweight mode |
+| **E: Full recall** | Deep analysis |
+
+### 🗜️ 5 Compression Strategies
+`summarize` · `extract` · `delete` · `promote` · `archive`
+- AI recommends the best strategy before compression
+- Partial compression (by line range or keyword) supported
+- Confirms before any destructive action
+
+### 🔔 Alert System
+Four alert levels with automatic defense:
+```
+Normal (<60%) → Watch (60-79%) → Critical (80-94%) → Danger (≥95%)
+```
+Auto-pauses writes before context overflow.
+
+### 🔍 Self-Introspection
+Every answer checks:
+- Is the task clear?
+- Is any required information missing?
+- Am I stuck in a loop?
+- Should I recall relevant memories?
+
+### 🔌 LanceDB Integration
+Works with [memory-lancedb-pro](https://github.com/CortexReach/memory-lancedb-pro):
+- Vector search + BM25 full-text
+- Cross-encoder reranking
+- Automatic importance scoring
+- **No external database** — embedded single-file storage
+- **Graceful degradation** — works in pure-memory mode without LanceDB
+
+---
+
+## Quick Start
+
+### Install Skill
+
 ```bash
-hawk alert on    # 开启
-hawk alert off   # 关闭
-hawk alert set 70 # 设置阈值
-```
+# Install memory-lancedb-pro (recommended)
+openclaw plugins install memory-lancedb-pro@beta
 
----
-
-### 📦 项目分流
-
-按话题/项目拆分记忆文件，`memory_search` 统一检索：
-```
-memory/
-├── qujingskills.md   ← Skill 相关
-├── 项目状态.md       ← 进度
-└── 用户偏好.md      ← 沟通习惯
-```
-
----
-
-## 安装
-
-### 方式一：安装 Skill（OpenClaw）
-
-```bash
+# Activate Context-Hawk skill
 openclaw skills install ./context-hawk.skill
 ```
 
-### 方式二：克隆仓库
-
-```bash
-git clone git@github.com:relunctance/context-hawk.git
-```
-
-### 安装 CLI 工具
+### Install CLI Tool
 
 ```bash
 chmod +x scripts/hawk
 ln -s scripts/hawk /usr/local/bin/hawk
 ```
 
----
-
-## 使用命令
+### Initialize
 
 ```bash
-hawk init              # 初始化分层结构
-hawk status            # 查看上下文状态
-hawk compress today summarize   # 压缩 today.md
-hawk alert on          # 开启报警
-hawk split --by-project # 按项目分流
+hawk init
 ```
 
 ---
 
-## 文件结构
+## CLI Commands
+
+```bash
+hawk init              # Initialize memory structure
+hawk status           # View context usage
+hawk compress         # Compress memory (interactive)
+hawk strategy A       # Switch to High-importance mode
+hawk introspect       # Self-introspection report
+hawk search <query>   # Hybrid search (vector + full-text)
+hawk alert on         # Enable alerts
+hawk backup          # Backup LanceDB
+```
+
+---
+
+## Memory Structure
+
+```
+memory/
+├── today.md      ← Today's new entries (appended every session)
+├── week.md       ← Weekly summary (merged Fridays)
+├── month.md      ← Monthly archive (compressed monthly)
+└── archive/     ← Historical archives (not in context)
+```
+
+Plus LanceDB stores the vector embeddings for semantic search.
+
+---
+
+## File Structure
 
 ```
 context-hawk/
 ├── SKILL.md
 ├── scripts/
-│   └── hawk          # CLI工具
+│   └── hawk              # Python CLI tool
 └── references/
-    ├── memory-system.md           # 分层记忆说明
-    ├── compression-strategies.md  # 5种压缩策略详解
-    ├── alerting.md                # 报警系统
-    ├── cli.md                     # CLI完整文档
-    └── split-patterns.md          # 项目分流模式
+    ├── memory-system.md           # Four-tier architecture
+    ├── structured-memory.md      # Memory format & importance
+    ├── injection-strategies.md   # 5 injection strategies
+    ├── compression-strategies.md  # 5 compression strategies
+    ├── alerting.md               # Alert system
+    ├── self-introspection.md     # Self-introspection
+    ├── lancedb-integration.md    # LanceDB integration
+    └── cli.md                    # CLI documentation
 ```
 
 ---
 
-## 发布信息
+## Requirements
 
-- **版本**: v1.0.0
-- **作者**: 趣近团队
-- **许可证**: MIT
+- **OpenClaw 2026.3+**
+- LanceDB (optional, graceful degradation)
+- Python 3.8+ (for CLI tool)
+
+---
+
+## License
+
+MIT — free to use, modify, and distribute.
