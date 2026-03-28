@@ -277,20 +277,21 @@ def hawk_task(description: str = None, action: str = None):
             if lines:
                 try:
                     last = json.loads(lines[-1])
-                    print(f"""[hawk] Current task
-
-  Task ID:  {last.get('task_id', 'N/A')}
-  Desc:     {last.get('description', 'N/A')}
-  Progress: {last.get('progress', 0)}%
-  Status:   {last.get('status', 'N/A')}
-  Created:   {last.get('created_at', 'N/A')}
-
-  Next steps:")
+                    print("[hawk] Current task")
+                    print()
+                    print("  Task ID:  " + last.get('task_id', 'N/A'))
+                    print("  Desc:     " + last.get('description', 'N/A'))
+                    print("  Progress: " + str(last.get('progress', 0)) + "%")
+                    print("  Status:   " + str(last.get('status', 'N/A')))
+                    print("  Created:   " + last.get('created_at', 'N/A'))
+                    print()
+                    print("  Next steps:")
                     for s in last.get('next_steps', []):
-                        print(f"    - {s}")
-                    print(f"\n  Outputs:")
+                        print("    - " + s)
+                    print()
+                    print("  Outputs:")
                     for o in last.get('outputs', []):
-                        print(f"    - {o}")
+                        print("    - " + o)
                 except Exception as e:
                     print(f"[hawk] Error reading task: {e}")
             else:
@@ -395,21 +396,22 @@ def hawk_resume():
     with open(task_file, 'w', encoding='utf-8') as f:
         f.write(json.dumps(task, ensure_ascii=False) + "\n")
 
-    print(f"""[Context-Hawk] Task Resume
-
-  Task ID:   {task.get('task_id', 'N/A')}
-  Desc:      {task.get('description', 'N/A')}
-  Progress:  {task.get('progress', 0)}%
-  Status:    🔄 {task.get('status', 'in_progress')}
-
-  Next steps:")
+    print("[Context-Hawk] Task Resume")
+    print()
+    print("  Task ID:   " + task.get('task_id', 'N/A'))
+    print("  Desc:      " + task.get('description', 'N/A'))
+    print("  Progress:  " + str(task.get('progress', 0)) + "%")
+    print("  Status:    " + str(task.get('status', 'in_progress')))
+    print()
+    print("  Next steps:")
     for s in task.get('next_steps', []):
-        print(f"    - {s}")
-    print(f"\n  Outputs:")
+        print("    - " + s)
+    print()
+    print("  Outputs:")
     for o in task.get('outputs', []):
-        print(f"    - {o}")
-    print(f"\n  [Press Enter to continue]")
-
+        print("    - " + o)
+    print()
+    print("  [Press Enter to continue]")
 
 def hawk_introspect(deep: bool = False, json_fmt: bool = False):
     """Self-introspection report."""
