@@ -1,209 +1,202 @@
-# 压缩策略详解 · Compression Strategies v2
+# Compression Strategies
 
 ---
 
-## 5种策略总览
+## 5 Strategies
 
-| 策略 | 命令 | 适用场景 | 压缩比 |
-|------|------|---------|--------|
-| `summarize` | `/hawk compress summarize` | 过程冗长、结论清晰 | 70-90% |
-| `extract` | `/hawk compress extract` | 事实/决策/清单类 | 40-60% |
-| `delete` | `/hawk compress delete` | 临时/调试/过时 | 100% |
-| `promote` | `/hawk compress promote` | learnings/规范类 | 按需 |
-| `archive` | `/hawk compress archive` | 超过30天 | 0%（只是移动） |
+| Strategy | Command | Best For | Effect |
+|-----------|---------|----------|--------|
+| `summarize` | `/hawk compress summarize` | Long process, clear conclusion | 500 lines → 30 |
+| `extract` | `/hawk compress extract` | Facts/decisions/lists | Keep core facts |
+| `delete` | `/hawk compress delete` | Temp/debug/outdated | Full delete |
+| `promote` | `/hawk compress promote` | learnings | Aggregate to topic file |
+| `archive` | `/hawk compress archive` | >30 days | Move to archive layer |
 
 ---
 
-## 压缩前确认
+## Pre-Compression Confirmation
 
-所有压缩操作必须确认：
-
-```
-[Context-Hawk] 确认压缩
-  范围：today.md（186行）
-  策略：summarize（摘要）
-  预计：从186行压缩至约28行
-
-  请选择：
-    [1] 全部压缩
-    [2] 只压缩部分内容（输入行范围或关键词）
-    [3] 取消
-```
-
-### 部分压缩交互
+All compress operations require confirmation:
 
 ```
-[Context-Hawk] 部分压缩
+[Context-Hawk] Confirm compression
+  Target: today.md (186 lines)
+  Strategy: summarize (summarize)
 
-  today.md 共 186 行，当前内容摘要：
-  [1-30]   老周提问关于 Skill 架构
-  [31-80]   多轮讨论过程（冗长）
-  [81-120]  最终决策结论
-  [121-186] 后续细节
+  [1] Compress all
+  [2] Compress part only (enter line range or keyword)
+  [3] Cancel
+```
 
-  请输入要压缩的范围（支持多种格式）：
-    - 行范围：5-80
-    - 关键词：输入 "Skill" 可定位包含的行
-    - 类型：输入 "讨论" 可定位讨论类内容
+### Partial Compression
+
+```
+[Context-Hawk] Partial compression
+
+  today.md — 186 lines total. Preview:
+
+  [1-30]   User question about Skill architecture
+  [31-80]   Multi-turn discussion (verbose)
+  [81-120]  Final decision
+  [121-186] Additional details
+
+  Enter line range to compress (e.g., 5-50)
+  Or enter keyword to locate specific content:
 ```
 
 ---
 
-## 智能策略推荐
+## Smart Strategy Recommendation
 
-压缩前自动分析并推荐：
+Before compression, AI analyzes and recommends:
 
 ```markdown
-[Context-Hawk] 智能策略推荐
+[Context-Hawk] Strategy recommendation
 
-  文件：today.md (186行)
+  File: today.md (186 lines)
 
-  内容分析（AI判断）：
-  ┌──────────────────────────────────────────────────┐
-  │ 30% 过程讨论   → summarize（节省~50行）            │
-  │ 25% 具体代码   → extract（保留核心代码片段）        │
-  │ 20% 决策结论   → promote（聚合到week.md）         │
-  │ 15% 调试日志   → delete（完全删除）               │
-  │ 10% 重要知识   → 保留                             │
-  └──────────────────────────────────────────────────┘
+  Content analysis:
+  ┌────────────────────────────────────────────────────────┐
+  │ 30% discussion process   → summarize (save ~50 lines)  │
+  │ 25% specific code      → extract (keep core snippets)  │
+  │ 20% decision records   → promote (aggregate to week)  │
+  │ 15% debug logs        → delete (fully remove)        │
+  │ 10% important facts    → keep                          │
+  └────────────────────────────────────────────────────────┘
 
-  推荐组合：summarize + delete + promote
+  Recommended combination: summarize + delete + promote
 
-  预计效果：186行 → 45行（减少76%）
+  Estimated: 186 lines → 45 lines (76% reduction)
 
-  [1] 执行推荐组合
-  [2] 手动选择策略
-  [3] 取消
+  [1] Execute recommended
+  [2] Manual selection
+  [3] Cancel
 ```
 
 ---
 
-## 策略1: summarize（摘要）
+## Strategy 1: Summarize
 
-保留结论，删除过程。
+Keep conclusions, remove process.
 
 ```markdown
-## 2026-03-28 Skill架构讨论
+## 2026-03-28 Skill Architecture Discussion
 
-### 过程（压缩前 60行）
-讨论是否拆分skill...
-第一轮结论：不拆分，因为...
-后来老周说...
-又讨论了...
-再后来...
-最终决定：不拆分
+### Process (before — 60 lines)
+Discussed whether to split the skill...
+First conclusion: no split, because...
+User said...
+Discussed again...
+Final decision: no split
 
-### 结论（压缩后 8行）
-- 决策：不拆分skill，电商作为 biz/examples/
-- 原因：通用框架+业务示例是正确方向
+### Conclusion (after — 8 lines)
+- Decision: do not split skill; e-commerce as biz/examples/
+- Reason: generic framework + business examples is the right direction
 ```
 
 ---
 
-## 策略2: extract（抽取）
+## Strategy 2: Extract
 
-从大量内容中抽取关键事实。
+Extract key facts from large content.
 
 ```markdown
-## 团队规范（extract后）
+## Team Rules (extracted)
 
-### 核心事实
-| Agent | 角色 | 核心职责 |
-|-------|------|---------|
-| 唐僧 | 架构师 | 技术方案、规范制定 |
-| 悟空 | 后端 | Logic/Dao/Model |
-| 八戒 | 前端 | Filament/Blade |
-| 白龙 | 测试 | 测试用例，覆盖率≥98% |
+### Core Facts
+| Agent | Role | Core Responsibility |
+|-------|------|---------------------|
+| Architect | Architect | Technical specs, rule enforcement |
+| Backend | Backend | Logic/Dao/Model |
+| Frontend | Frontend | Filament/Blade |
+| Tester | Tester | Test cases, coverage ≥98% |
 
-### 关键规范（4条）
-1. 四层架构禁止跨层
-2. DTO+Enum强制使用
-3. 测试覆盖率≥98%
-4. API必须版本化
+### Key Rules (4 total)
+1. Four-layer architecture — no cross-layer calls
+2. DTO+Enum mandatory
+3. Coverage ≥98%
+4. APIs must be versioned
 ```
 
 ---
 
-## 策略3: delete（删除）
+## Strategy 3: Delete
 
-彻底删除，需二次确认：
+Dangerous — requires double confirmation:
 
 ```
-[Context-Hawk] ⚠️ 危险操作
-  将删除：
-  - today.md 第 15-28 行（调试日志）
+[Context-Hawk] ⚠️ Destructive operation
+  Will delete:
+  - today.md lines 15-28 (debug logs)
 
-  此操作不可逆，建议先 /hawk backup
+  This is irreversible.
 
-  [1] 确认删除
-  [2] 只删除第N行（N为奇数的行）
-  [3] 取消
+  [1] Confirm delete
+  [2] Only delete lines where N is odd
+  [3] Cancel
 ```
 
 ---
 
-## 策略4: promote（晋升）
+## Strategy 4: Promote
 
-将分散的 learnings 聚合到主题文件：
+Aggregate scattered learnings to topic files:
 
 ```markdown
-[Context-Hawk] promote 建议
+[Context-Hawk] Promote suggestion
 
-  扫描到以下分散 learnings：
+  Found these scattered learnings:
 
-  today.md:42    → "老周喜欢简洁回复"（老周偏好）
-  today.md:78    → "测试覆盖率要98%"（团队规范）
-  week.md:15     → "skill要能复用"（技术积累）
+  today.md:42   → "user prefers concise replies" → user-preferences.md
+  today.md:78   → "coverage must be 98%" → team-rules.md
+  week.md:15   → "skill must be reusable" → tech-patterns.md
 
-  建议晋升到：
-  - 老周偏好.md
-  - 团队规范.md
-  - 技术积累.md
-
-  [1] 全部晋升
-  [2] 选择性晋升
-  [3] 取消
+  [1] Promote all
+  [2] Selective promotion
+  [3] Cancel
 ```
 
 ---
 
-## 策略5: archive（归档）
+## Strategy 5: Archive
 
-将超期内容移入 archive 层（不删除）：
+Move content older than 30 days to archive (not deleted):
 
 ```markdown
-[Context-Hawk] archive 建议
+[Context-Hawk] Archive suggestion
 
-  以下内容超过30天，建议归档：
+  The following is >30 days old — archive:
 
-  - memory/month.md 中的2026-02内容
-  - memory/week.md 中的第1-2周内容
+  - memory/month.md content from 2026-02
+  - memory/week.md weeks 1-2
 
-  归档后：移入 memory/archive/2026-02/
+  Will move to: memory/archive/2026-02/
 
-  [1] 全部归档
-  [2] 选择性归档
-  [3] 取消
+  [1] Archive all
+  [2] Selective archive
+  [3] Cancel
 ```
 
 ---
 
-## 批量压缩
+## Batch Compression
 
 ```bash
-hawk compress all summarize     # 对所有层执行摘要
-hawk compress --dry-run        # 预览不执行
-hawk compress today delete "调试"  # 删除today.md中包含"调试"的行
+hawk compress all summarize      # Summarize all layers
+hawk compress --dry-run          # Preview without executing
+hawk compress today delete "debug"  # Delete lines containing "debug"
 ```
 
 ---
 
-## 压缩与记忆层级联动
+## Compression ↔ Memory Tier Interaction
 
-压缩操作自动更新 LanceDB 中的衰减分：
+After compression, LanceDB decay scores update:
 
-- summarize（保留核心）：decay_score × 1.0
-- extract（保留事实）：decay_score × 1.0
-- promote（聚合）：重新计算 importance
-- delete（删除）：decay_score → 0，触发清理
-- archive（归档）：移入 archive 表
+| Strategy | Effect on decay_score |
+|----------|----------------------|
+| summarize (keep core) | × 1.0 |
+| extract (keep facts) | × 1.0 |
+| promote | Recalculate importance |
+| delete | decay_score → 0, trigger cleanup |
+| archive | Move to archive table |

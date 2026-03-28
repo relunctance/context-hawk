@@ -1,72 +1,155 @@
-# CLI 工具文档 · context-hawk v2
+# CLI Reference
 
 ---
 
-## 安装
+## Installation
 
 ```bash
-chmod +x ~/.openclaw/workspace/skills/context-hawk/scripts/hawk
-ln -s ~/.openclaw/workspace/skills/context-hawk/scripts/hawk /usr/local/bin/hawk
+chmod +x scripts/hawk
+ln -s scripts/hawk /usr/local/bin/hawk
 ```
 
 ---
 
-## 命令总览
+## Command Overview
 
 ```
 hawk <command> [options]
 
-核心命令：
-  hawk init                  初始化（含LanceDB初始化）
-  hawk status               查看上下文状态
-  hawk compress <target> [strategy]   压缩记忆
-  hawk strategy <A|B|C|D|E>  切换注入策略
-  hawk introspect [--json]    自省报告
-  hawk search <query>        混合检索（向量+全文）
-  hawk inject               手动触发上下文注入
+Task management:
+  hawk task ["description"]    Create/view task
+  hawk task --start            Start/resume task
+  hawk task --step N done     Mark step N complete
+  hawk task --next "action"   Add next action
+  hawk task --output "file"   Record output
+  hawk task --block "reason"  Record blocker
+  hawk task --done             Complete task
+  hawk task --list            List all tasks
+  hawk resume                 Resume last task ← CORE!
 
-LanceDB管理：
-  hawk extract [--force]     触发记忆提取
-  hawk recall <query>       测试召回
-  hawk backup               备份向量库
-  hawk export [--json]       导出记忆
-  hawk import <file>        从备份恢复
+Memory management:
+  hawk init                   Initialize (LanceDB optional)
+  hawk status [--json]        View context usage
+  hawk compress [target] [strategy]  Compress memory
+  hawk strategy [A|B|C|D|E]   Switch injection strategy
+  hawk introspect [--deep]    Self-introspection report
+  hawk search <query>         Hybrid search
+  hawk inject                 Manual context injection
 
-报警：
-  hawk alert on|off|set <n>  报警开关
+Auto-trigger:
+  hawk check                  Run auto-check now (every 10 rounds)
+  hawk check --rounds 5       Check after 5 rounds
 
-分流：
-  hawk split --by-project    按项目分流
-  hawk split --by-topic      按话题分流
+LanceDB management:
+  hawk extract [--force]       Trigger memory extraction
+  hawk recall <query>         Test recall
+  hawk backup                 Backup LanceDB
+  hawk export [--json]        Export memories
+
+Alerts:
+  hawk alert on|off|set <n>   Toggle/configure alerts
+```
+
+---
+
+## hawk task
+
+```bash
+hawk task "Complete the API documentation"  # Create task
+hawk task                               # View current task
+hawk task --start                      # Start/resume task
+hawk task --step 1 done             # Mark step 1 done
+hawk task --next "Write README"       # Add next action
+hawk task --output "SKILL.md"         # Record output
+hawk task --block "Missing token"     # Record blocker
+hawk task --done                      # Complete task
+hawk task --abort                      # Abandon task
+hawk task --list                      # List all tasks
+```
+
+### Task Output
+
+```
+[Context-Hawk] Current task
+
+  ID:       task_20260329_001
+  Desc:     Complete the API documentation
+  Progress: 65% (3/5 steps)
+  Status:   🔄 in_progress
+  Created:   2026-03-29 00:00
+
+  Completed:
+    ✅ 1. SKILL.md completed
+    ✅ 2. constitution.md completed
+    ✅ 3. architect.md completed
+
+  Current:
+    🔄 4. Review architecture template
+
+  Pending:
+    ⬜ 5. Report to user
+
+  Constraints:
+    - Coverage must reach 98%
+    - APIs must be versioned
+
+  Outputs:
+    - SKILL.md
+    - constitution.md
+    - architect.md
+```
+
+---
+
+## hawk resume
+
+```
+$ hawk resume
+
+[Context-Hawk] Task Resume
+
+  Task:    Complete the API documentation
+  Progress: 65% (3/5 steps complete)
+  Status:   🔄 in_progress
+
+  Completed:
+    ✅ 1. SKILL.md completed
+    ✅ 2. constitution.md completed
+
+  Current:
+    🔄 3. Review architecture template
+
+  Next:
+    ⬜ 4. Report to user
+
+  [Press Enter to continue step 3]
 ```
 
 ---
 
 ## hawk status
 
-```bash
-hawk status [--json]
 ```
+[Context-Hawk] Context Status
 
-```
-[Context-Hawk] 上下文状态 v2
+  Today:    today.md    12 lines
+  Week:     week.md     34 lines
+  Month:    month.md    8 lines
+  Total:    54 lines (estimated ~12% context)
 
-  今日加载：   today.md    12行
-  本周加载：   week.md     34行
-  上下文总量：   46行
+  LanceDB Memory Layers:
+  ┌────────────────────────────────────┐
+  │ Working Memory   23 memories  ~8%     │
+  │ Short-term     156 memories ~21%     │
+  │ Long-term       89 memories ~12%     │
+  │ Archive        412 memories —      │
+  └────────────────────────────────────┘
 
-  LanceDB 记忆层：
-  ┌─────────────────────────────────────────┐
-  │ Working Memory   23条  估计占比  8%     │
-  │ Short-term      156条  估计占比  21%    │
-  │ Long-term       89条   估计占比  12%     │
-  │ Archive          412条  不计入上下文      │
-  └─────────────────────────────────────────┘
-
-  复合衰减分：  0.73（正常）
-  当前注入策略：B（任务相关）
-  状态：✅ 正常
-  报警：🔔 开启（阈值60%）
+  Current task: ✅ task_20260329_001 (65% done)
+  Active strategy: B (task-related)
+  Status: ✅ Normal
+  Alert: 🔔 Enabled (threshold: 60%)
+  Auto-check: every 10 rounds (3 rounds since last check)
 ```
 
 ---
@@ -74,14 +157,11 @@ hawk status [--json]
 ## hawk compress
 
 ```bash
-hawk compress <target> [strategy] [--lines <start-end>] [--dry-run]
-```
-
-```bash
-hawk compress today summarize      # 摘要压缩
-hawk compress week extract        # 抽取压缩
-hawk compress all promote --dry-run  # 预览晋升
-hawk compress month archive       # 归档
+hawk compress today summarize           # Summarize today.md
+hawk compress week extract             # Extract week.md
+hawk compress all promote --dry-run   # Preview promote all
+hawk compress month archive           # Archive month.md
+hawk compress today delete "debug"    # Delete debug lines
 ```
 
 ---
@@ -89,116 +169,46 @@ hawk compress month archive       # 归档
 ## hawk strategy
 
 ```bash
-hawk strategy [A|B|C|D|E]
-hawk strategy    # 查看当前策略
-```
-
-```
-[Context-Hawk] 注入策略
-
-  当前策略：B（任务相关模式）
-
-  A - 高重要度  (importance ≥ 0.7)  节省60-70%token
-  B - 任务相关  (scope匹配)          节省30-40%token  ← 当前
-  C - 最近对话  (最近10轮)          节省50%token
-  D - Top5召回  (access_count Top5) 节省70%token
-  E - 全部召回  (无过滤)            100%token
+hawk strategy          # View current strategy
+hawk strategy A        # High-importance (importance ≥ 0.7)
+hawk strategy B        # Task-related (default)
+hawk strategy C        # Recent conversation (last 10 turns)
+hawk strategy D        # Top5 recall (access_count top 5)
+hawk strategy E        # Full recall (no filter)
 ```
 
 ---
 
 ## hawk introspect
 
-```bash
-hawk introspect
-hawk introspect --deep
-hawk introspect --json
 ```
+[Context-Hawk] Introspection
 
-```
-[Context-Hawk] 自省报告
+  1. Task Clarity: ✅ Clear
+     Current: task_20260329_001 (65% done)
 
-  1. 任务明确度：✅ 明确
-     当前任务：更新 qujin-laravel-team Skill
+  2. Info Completeness: ✅ Complete
+     Requirements: ✅ clear
+     Tech spec: ✅ available
 
-  2. 信息完整性：✅ 完整
-     需求：✅ 规范清晰
-     技术方案：✅ 已有
+  3. Context Usage: ✅ Healthy
+     Current: 41% / Threshold: 80%
 
-  3. 上下文占用：✅ 正常
-     当前：41% / 阈值：80%
+  4. Loop Detection: ✅ No loops
 
-  4. 卡点检测：✅ 无
-     无重复失败，无死循环
-
-  5. 记忆召回：💡 可召回 2 条相关
-     - 老周的沟通偏好（importance: 0.9）
-     - 四个Agent职责边界（importance: 0.85）
-```
-
----
-
-## hawk search（混合检索）
-
-```bash
-hawk search <query>
-hawk search "老周的偏好" --json
-```
-
-```
-[Context-Hawk] 混合检索
-
-  查询：老周的偏好
-
-  向量检索结果（Top3）：
-  [1] 老周的沟通偏好（0.94）← Long-term
-  [2] 悟空的开发风格（0.71）← Short-term
-  [3] 技术选型偏好（0.68）← Short-term
-
-  全文检索结果（Top3）：
-  [1] USER.md - 老周偏好
-  [2] 团队规范.md - 沟通要求
-  [3] memory/week.md - 周汇总
-
-  [R] 召回：老周的沟通偏好
-```
-
----
-
-## hawk recall（召回测试）
-
-```bash
-hawk recall "四层架构规范"
-```
-
-```
-[Context-Hawk] 召回测试
-
-  查询：四层架构规范
-
-  召回记忆：
-  ┌──────────────────────────────────────────────────┐
-  │ [Core] 四层架构红线：Controller→Logic→Dao→Model   │
-  │ importance: 0.95 | access_count: 23            │
-  │ last_accessed: 2小时前                           │
-  │ decay_score: 0.91                              │
-  └──────────────────────────────────────────────────┘
-
-  建议注入上下文：是（importance ≥ 0.8）
+  5. Memory Recall: 💡 2 relevant available
+     - User communication preferences (importance: 0.9)
+     - Four Agent responsibilities (importance: 0.85)
 ```
 
 ---
 
 ## hawk backup
 
-```bash
-hawk backup
-hawk backup --output ~/backup_hawk.zip
 ```
-
-```
-[hawk] 备份完成
-  路径：~/.openclaw/memory-lancedb-backup-20260328.tar.gz
-  大小：2.3MB
-  内容：working.lance + shortterm.lance + longterm.lance + archive.lance
+[hawk] Backup complete
+  Path: ~/.openclaw/memory-lancedb-backup-20260329.tar.gz
+  Size: 2.3MB
+  Contents: working.lance + shortterm.lance + longterm.lance + archive.lance
+  Task state: ✅ included (task_state.jsonl)
 ```
