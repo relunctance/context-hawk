@@ -8,6 +8,8 @@
 [![OpenClaw Compatible](https://img.shields.io/badge/OpenClaw-2026.3%2B-brightgreen)](https://github.com/openclaw/openclaw)
 [![ClawHub](https://img.shields.io/badge/ClawHub-context--hawk-blue)](https://clawhub.com)
 
+**English** | [中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Français](README.fr.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Italiano](README.it.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
+
 ---
 
 ## ¿Qué hace?
