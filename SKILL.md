@@ -252,6 +252,55 @@ print(stats)
 
 ---
 
+## HawkContext — autoCapture + autoRecall 包装器
+
+HawkContext 是一个 Python 上下文管理器，包装 LLM 调用，自动实现：
+- **autoRecall**：对话开始时自动检索相关记忆并注入上下文
+- **autoCapture**：对话结束时自动提取记忆存入 LanceDB
+
+```python
+from hawk import HawkContext
+
+# 初始化（自动从环境变量读取配置）
+hawk = HawkContext(
+    provider="minimax",      # minimax | openai | groq | ollama | keyword
+    api_key="sk-cp-xxx",
+    model="MiniMax-M2.7"
+)
+
+# 对话开始时自动 recall
+# 对话结束时（with 块退出时）自动 capture
+with hawk:
+    response = hawk.chat(
+        "老板之前用什么技术栈？",
+        system_prompt="你是一个助手"
+    )
+    print(response)
+
+# 也可以手动控制
+hawk.recall("用户的项目偏好")
+hawk.capture()
+```
+
+**自动 recall 机制：**
+- `hawk.recall()` 在 `hawk.chat()` 内部被调用
+- 检索当前用户消息相关的记忆
+- 结果自动插入 LLM 消息中
+
+**支持 provider：**
+| provider | API Key | 说明 |
+|----------|---------|------|
+| minimax | 需要 | MiniMax-M2.7（推荐） |
+| openai | 需要 | GPT-4o 等 |
+| groq | 不需要 | 免费 Llama-3 |
+| ollama | 不需要 | 本地模型 |
+| keyword | 不需要 | 纯规则提取 |
+
+**配置优先级：**
+1. 显式传参 > 环境变量 > 默认值
+
+---
+
 ## 与 hawk-bridge 的关系
 
 | | context-hawk | hawk-bridge |
