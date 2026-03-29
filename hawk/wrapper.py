@@ -30,15 +30,15 @@ from .governance import Governance
 
 @dataclass
 class HawkConfig:
-    provider: str = "keyword"
+    provider: str = "groq"  # groq = free, no API key needed
     api_key: str = ""
-    model: str = "MiniMax-M2.7"
-    base_url: str = ""
+    model: str = "llama-3.3-70b-versatile"  # groq free model
+    base_url: str = "https://api.groq.com/openai/v1"
     top_k: int = 3
     min_score: float = 0.5
     capture_threshold: float = 0.5
     memory_dir: str = "~/.hawk"
-    llm_base_url: str = ""
+    llm_base_url: str = "https://api.groq.com/openai/v1"
 
 
 class HawkContext:
@@ -46,7 +46,7 @@ class HawkContext:
     Python LLM 上下文包装器，自动记忆捕获 + 检索
 
     用法:
-        hawk = HawkContext(provider="minimax", api_key="sk-xxx")
+        hawk = HawkContext()  # 默认 groq，无需 API Key
         with hawk:
             response = hawk.chat("你好")
     """
@@ -63,16 +63,16 @@ class HawkContext:
         初始化 HawkContext
 
         Args:
-            provider: LLM 提供商 — "keyword" | "openai" | "minimax" | "groq" | "ollama"
-            api_key: API Key（部分 provider 不需要）
+            provider: LLM 提供商 — "groq"(默认免费) | "keyword"(无需key) | "ollama"(本地免费) | "minimax" | "openai"
+            api_key: API Key（groq/keyword/ollama 不需要）
             model: 模型名
             base_url: 自定义 API 端点
             **kwargs: 其他配置（top_k, capture_threshold 等）
         """
         # Auto-detect from env
         api_key = api_key or os.environ.get("MINIMAX_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
-        provider = provider or os.environ.get("LLM_PROVIDER", "keyword")
-        model = model or os.environ.get("MINIMAX_MODEL") or os.environ.get("OPENAI_MODEL", "MiniMax-M2.7")
+        provider = provider or os.environ.get("LLM_PROVIDER", "groq")  # groq = free, no key needed
+        model = model or os.environ.get("OPENAI_MODEL", "llama-3.3-70b-versatile")
 
         if base_url is None:
             if provider == "minimax":
