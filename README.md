@@ -231,3 +231,18 @@ context-hawk/
 ## License
 
 MIT — free to use, modify, and distribute.
+
+---
+
+## ⚠️ Merged into hawk-bridge
+
+**context-hawk 的核心模块已整合进 [hawk-bridge](https://github.com/relunctance/hawk-bridge)**
+
+hawk-bridge = context-hawk Python 核心 + OpenClaw Hook 自动触发 + 完整 Skill
+
+**新用户请直接安装 hawk-bridge：**
+```bash
+openclaw skills install https://github.com/relunctance/hawk-bridge
+```
+
+本仓库保留用于历史参考，不再维护。
