@@ -228,21 +228,26 @@ context-hawk/
 
 ---
 
-## License
 
-MIT — free to use, modify, and distribute.
 
----
+## 🦅 Context-Hawk — Pure Python Memory Package
 
-## ⚠️ Merged into hawk-bridge
+> **纯 Python 记忆包，零外部依赖，零 API Key，直接 import 就能用**
 
-**context-hawk 的核心模块已整合进 [hawk-bridge](https://github.com/relunctance/hawk-bridge)**
+context-hawk 是一个独立的 Python 包，提供：
+- 四层记忆衰减（MemoryManager）
+- 向量语义检索（VectorRetriever）
+- Markdown 文件导入（MarkdownImporter）
+- 上下文压缩（ContextCompressor）
+- 记忆提取（Extractor — 支持零 API 关键词模式）
+- 自我反思（SelfImproving）
+- 系统巡检（Governance）
 
-hawk-bridge = context-hawk Python 核心 + OpenClaw Hook 自动触发 + 完整 Skill
+**不需要 OpenClaw，不需要 API Key**，可嵌入任何 Python 项目。
 
-**新用户请直接安装 hawk-bridge：**
 ```bash
-openclaw skills install https://github.com/relunctance/hawk-bridge
+pip install lancedb
+python3.12 -c "from hawk.memory import MemoryManager; print('OK')"
 ```
 
-本仓库保留用于历史参考，不再维护。
+详细文档见 [SKILL.md](SKILL.md)
