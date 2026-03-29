@@ -1,22 +1,26 @@
-#!/usr/bin/env bash
-# install.sh — Auto-link hawk command to ~/bin
-# Run after: openclaw skills install ./context-hawk.skill
-
+#!/bin/bash
+# context-hawk 一键安装脚本
 set -e
 
-echo "[install] Context-Hawk — creating symlinks..."
+echo "Installing context-hawk..."
 
-# Ensure ~/bin exists and is in PATH
-mkdir -p "$HOME/bin"
-if ! echo "$PATH" | grep -q "$HOME/bin"; then
-    echo "[install] Adding ~/bin to PATH in ~/.bashrc..."
-    echo 'export PATH="$HOME/bin:$PATH"' >> "$HOME/.bashrc"
-    export PATH="$HOME/bin:$PATH"
+# 1. 检测 Python 版本
+PYTHON=$(command -v python3.12 || command -v python3 || command -v python)
+echo "Using Python: $PYTHON"
+
+# 2. 安装核心依赖
+$PYTHON -m pip install lancedb openai -q
+
+# 3. 验证安装
+$PYTHON -c "from hawk.memory import MemoryManager; print('hawk installed OK')"
+
+# 4. 自动导入已有记忆（如有）
+if [ -d "$HOME/.openclaw/memory" ]; then
+    echo "发现记忆文件，自动导入..."
+    $PYTHON -m hawk.markdown_importer --memory-dir "$HOME/.openclaw/memory" 2>/dev/null || true
 fi
 
-# Create symlink
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ln -sf "$SCRIPT_DIR/hawk" "$HOME/bin/hawk"
-
-echo "[install] Symlink created: ~/bin/hawk"
-echo "[install] Run: source ~/.bashrc && hawk status"
+echo "context-hawk 安装完成！"
+echo ""
+echo "使用方式："
+echo "  python3.12 -c \"from hawk.memory import MemoryManager; print('OK')\""
