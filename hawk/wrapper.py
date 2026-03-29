@@ -30,9 +30,9 @@ from .governance import Governance
 
 @dataclass
 class HawkConfig:
-    provider: str = "groq"  # groq = free, no API key needed
+    provider: str = "keyword"  # keyword = zero API key needed, offline extraction
     api_key: str = ""
-    model: str = "llama-3.3-70b-versatile"  # groq free model
+    model: str = "llama-3.3-70b-versatile"
     base_url: str = "https://api.groq.com/openai/v1"
     top_k: int = 3
     min_score: float = 0.5
@@ -46,7 +46,7 @@ class HawkContext:
     Python LLM 上下文包装器，自动记忆捕获 + 检索
 
     用法:
-        hawk = HawkContext()  # 默认 groq，无需 API Key
+        hawk = HawkContext()  # 默认 keyword，无需任何 API Key，开箱即用
         with hawk:
             response = hawk.chat("你好")
     """
@@ -63,15 +63,15 @@ class HawkContext:
         初始化 HawkContext
 
         Args:
-            provider: LLM 提供商 — "groq"(默认免费) | "keyword"(无需key) | "ollama"(本地免费) | "minimax" | "openai"
-            api_key: API Key（groq/keyword/ollama 不需要）
+            provider: LLM 提供商 — "keyword"(默认，无需key) | "groq"(免费) | "ollama"(本地免费) | "minimax" | "openai"
+            api_key: API Key（keyword 不需要）
             model: 模型名
             base_url: 自定义 API 端点
             **kwargs: 其他配置（top_k, capture_threshold 等）
         """
         # Auto-detect from env
         api_key = api_key or os.environ.get("MINIMAX_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
-        provider = provider or os.environ.get("LLM_PROVIDER", "groq")  # groq = free, no key needed
+        provider = provider or os.environ.get("LLM_PROVIDER", "keyword")  # keyword = zero API needed
         model = model or os.environ.get("OPENAI_MODEL", "llama-3.3-70b-versatile")
 
         if base_url is None:

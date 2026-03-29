@@ -385,7 +385,7 @@ def main():
     parser = argparse.ArgumentParser(description="hawk-bridge memory extractor")
     parser.add_argument("--api-key", default=os.environ.get("OPENAI_API_KEY", "") or os.environ.get("MINIMAX_API_KEY", ""))
     parser.add_argument("--model", default=os.environ.get("LLM_MODEL", "") or os.environ.get("MINIMAX_MODEL", "MiniMax-M2.7"))
-    parser.add_argument("--provider", default=os.environ.get("LLM_PROVIDER", "groq"),
+    parser.add_argument("--provider", default=os.environ.get("LLM_PROVIDER", "keyword"),
                         choices=["keyword", "openai", "groq", "ollama", "openrouter", "openclaw"])
     parser.add_argument("--base-url", default=os.environ.get("LLM_BASE_URL", "") or os.environ.get("MINIMAX_BASE_URL", ""))
     args = parser.parse_args()
