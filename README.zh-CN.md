@@ -37,7 +37,7 @@
 | 5 | **5 种注入策略** | A(高重要性) / B(任务相关) / C(最近) / D(Top5) / E(完整) |
 | 6 | **5 种压缩策略** | summarize / extract / delete / promote / archive |
 | 7 | **自我反思** | 检查任务清晰度、缺失信息、循环检测 |
-| 8 | **LanceDB 向量搜索** | 可选 — 混合向量 + BM25 检索 |
+| 8 | **LanceDB 向量搜索** | 可选 — 混合向量 + BM25 检索，支持 sentence-transformers 本地向量 |
 | 9 | **纯记忆备份** | 无需 LanceDB，JSONL 文件持久化 |
 | 10 | **自动去重** | 自动合并重复记忆 |
 
@@ -155,8 +155,8 @@ hawk resume               # 重启后继续 ← 核心功能！
 ## 🚀 快速开始
 
 ```bash
-# 安装 LanceDB 插件（推荐）
-openclaw plugins install memory-lancedb-pro@beta
+# 一键安装（推荐，自动装好所有依赖）
+bash <(curl -fsSL https://raw.githubusercontent.com/relunctance/hawk-bridge/master/install.sh)
 
 # 启用技能
 openclaw skills install ./context-hawk.skill
@@ -221,7 +221,7 @@ context-hawk/
 ## 🔌 技术规格
 
 - **持久化**: JSONL 本地文件，无需数据库
-- **向量搜索**: LanceDB（可选），自动回退到文件
+- **向量搜索**: LanceDB（可选）+ sentence-transformers 本地向量，自动回退到文件
 - **跨 Agent**: 通用，无业务逻辑，适用于任何 AI agent
 - **零配置**: 开箱即用，智能默认值
 - **可扩展**: 自定义注入策略、压缩策略、评分规则

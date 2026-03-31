@@ -37,7 +37,7 @@ Most AI agents suffer from **amnesia** — every new session starts from zero. C
 | 5 | **5 Injection Strategies** | A(high-imp) / B(task) / C(recent) / D(top5) / E(full) |
 | 6 | **5 Compression Strategies** | summarize / extract / delete / promote / archive |
 | 7 | **Self-Introspection** | Checks task clarity, missing info, loop detection |
-| 8 | **LanceDB Vector Search** | Optional — hybrid vector + BM25 retrieval |
+| 8 | **LanceDB Vector Search** | Optional — hybrid vector + BM25 retrieval, supports sentence-transformers local embedding |
 | 9 | **Pure-Memory Fallback** | Works without LanceDB, JSONL file persistence |
 | 10 | **Auto-Dedup** | Merges duplicate memories automatically |
 
@@ -155,8 +155,8 @@ hawk resume                           # Resume after restart ← CORE!
 ## 🚀 Quick Start
 
 ```bash
-# Install LanceDB plugin (recommended)
-openclaw plugins install memory-lancedb-pro@beta
+# One-command install (recommended — auto-installs all dependencies)
+bash <(curl -fsSL https://raw.githubusercontent.com/relunctance/hawk-bridge/master/install.sh)
 
 # Activate skill
 openclaw skills install ./context-hawk.skill
@@ -221,7 +221,7 @@ context-hawk/
 ## 🔌 Tech Specs
 
 - **Persistence**: JSONL local files, no database required
-- **Vector Search**: LanceDB (optional), auto-fallback to files
+- **Vector Search**: LanceDB (optional) + sentence-transformers local embedding, auto-fallback to files
 - **Cross-Agent**: Universal, no business logic, works with any AI agent
 - **Zero-Config**: Works out-of-the-box with smart defaults
 - **Extensible**: Custom injection strategies, compression policies, scoring rules
