@@ -5,11 +5,19 @@ vector_retriever.py — 从 LanceDB 向量库检索记忆
 - 根据用户 query 语义检索已导入的 markdown 记忆
 - 与 MemoryManager 记忆层融合
 - 支持自定义召回数量和相似度阈值
+- 支持本地 embedding（sentence-transformers）和 OpenAI 两种模式
 """
 
 import os
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, List
+
+# sentence-transformers 本地 embedding（可选）
+try:
+    from sentence_transformers import SentenceTransformer
+    SENTENCE_TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    SENTENCE_TRANSFORMERS_AVAILABLE = False
 
 
 @dataclass
@@ -29,6 +37,9 @@ class VectorRetriever:
     与 MemoryManager 共享同一个 LanceDB 实例
     """
 
+    # 默认本地 embedding 模型（sentence-transformers）
+    DEFAULT_LOCAL_MODEL = "all-MiniLM-L6-v2"
+
     def __init__(
         self,
         table_name: str = "memory_chunks",
@@ -42,6 +53,7 @@ class VectorRetriever:
         self.min_score = min_score
         self._table = None
         self._openai_client = None
+        self._local_model = None
 
     def _get_table(self):
         """延迟初始化 LanceDB 表"""
@@ -65,6 +77,36 @@ class VectorRetriever:
         self._openai_client = OpenAI(api_key=api_key)
         return self._openai_client
 
+    def _get_local_model(self):
+        """延迟初始化 sentence-transformers 本地模型"""
+        if self._local_model is not None:
+            return self._local_model
+        if not SENTENCE_TRANSFORMERS_AVAILABLE:
+            raise RuntimeError(
+                "sentence-transformers 未安装。运行: pip install sentence-transformers"
+            )
+        model_name = os.environ.get("SENTENCE_TRANSFORMERS_MODEL", self.DEFAULT_LOCAL_MODEL)
+        self._local_model = SentenceTransformer(model_name)
+        return self._local_model
+
+    def _get_embedding(self, texts: List[str]) -> List[List[float]]:
+        """
+        统一 embedding 接口：优先用本地 sentence-transformers，fallback 到 OpenAI
+        """
+        if SENTENCE_TRANSFORMERS_AVAILABLE and os.environ.get("USE_LOCAL_EMBEDDING") == "1":
+            model = self._get_local_model()
+            embeddings = model.encode(texts, normalize_embeddings=True)
+            # 转为 list 格式
+            return embeddings.tolist()
+
+        # Fallback to OpenAI
+        client = self._get_openai_client()
+        resp = client.embeddings.create(
+            model="text-embedding-3-small",
+            input=texts,
+        )
+        return [item.embedding for item in resp.data]
+
     def recall(self, query: str) -> list[RetrievedChunk]:
         """
         根据 query 语义检索记忆
@@ -75,12 +117,8 @@ class VectorRetriever:
             return []
 
         # 1. query → embedding
-        client = self._get_openai_client()
-        resp = client.embeddings.create(
-            model="text-embedding-3-small",
-            input=[query],
-        )
-        vector = resp.data[0].embedding
+        vectors = self._get_embedding([query])
+        vector = vectors[0]
 
         # 2. LanceDB ANN 检索
         results = table.search(vector).limit(self.top_k).to_list()
@@ -124,3 +162,27 @@ def recall_memory(query: str, top_k: int = 5) -> list[RetrievedChunk]:
     """一行调用：recall_memory('之前做过什么')"""
     retriever = VectorRetriever(top_k=top_k)
     return retriever.recall(query)
+
+
+# ---- 本地 embedding 接口（供 hawk-bridge TypeScript 调用的便捷函数）----
+def embed_texts_local(texts: List[str], model: str = None) -> List[List[float]]:
+    """
+    使用 sentence-transformers 生成文本向量（纯本地，无需 API）
+    供 hawk-bridge 在 TypeScript 侧无 Ollama/API Key 时调用。
+
+    用法（Python subprocess）：
+        python3 -c "from hawk.vector_retriever import embed_texts_local; print(embed_texts_local(['hello world']))"
+
+    环境变量：
+        USE_LOCAL_EMBEDDING=1  强制使用本地模型
+        SENTENCE_TRANSFORMERS_MODEL=all-MiniLM-L6-v2  指定模型
+    """
+    if not SENTENCE_TRANSFORMERS_AVAILABLE:
+        raise RuntimeError(
+            "sentence-transformers 未安装。运行: pip install sentence-transformers"
+        )
+
+    model_name = model or os.environ.get("SENTENCE_TRANSFORMERS_MODEL", "all-MiniLM-L6-v2")
+    st_model = SentenceTransformer(model_name)
+    embeddings = st_model.encode(texts, normalize_embeddings=True)
+    return embeddings.tolist()
