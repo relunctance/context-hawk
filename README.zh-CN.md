@@ -139,6 +139,51 @@ hawk resume               # 重启后继续 ← 核心功能！
 
 `summarize` · `extract` · `delete` · `promote` · `archive`
 
+### 策略概览
+
+| 策略 | 触发条件 | 动作 |
+|------|---------|------|
+| **summarize** | 文本超过500字符 | 调用 LLM 压缩成简洁摘要 |
+| **extract** | 任意记忆 | 从内容提取关键实体和事实 |
+| **delete** | importance < 0.3 且空闲 > 7天 | 永久删除 |
+| **promote** | importance ≥ 0.7 且 access ≥ 5 | short → long 升级 |
+| **archive** | 各层超时 | 移入 archive 层 |
+
+### 使用方式
+
+```python
+from hawk.compression import MemoryCompressor
+
+mc = MemoryCompressor()
+
+# 单条操作
+mc.summarize("mem_xxx")   # 压缩成长摘要
+mc.extract("mem_xxx")     # 提取关键事实
+mc.promote("mem_xxx")     # 升级为长期记忆
+mc.archive("mem_xxx")     # 归档
+
+# 批量
+mc.compress_all("archive")  # 归档所有超时记忆
+mc.compress_all("delete")   # 删除所有候选
+
+# 诊断报告
+report = mc.audit()
+print(report["candidates"])
+# {'to_summarize': [...], 'to_delete': [...], 'to_promote': [...], 'to_archive': [...]}
+```
+
+### 阈值配置
+
+| 规则 | 阈值 |
+|------|------|
+| 升级重要度 | ≥ 0.7 |
+| 升级访问次数 | ≥ 5 |
+| 删除重要度 | < 0.3 |
+| 删除空闲时间 | > 7 天 |
+| 归档 working | > 24 小时 |
+| 归档 short | > 30 天 |
+| 归档 long | > 90 天 |
+
 ---
 
 ## 🔔 4 级警报系统
