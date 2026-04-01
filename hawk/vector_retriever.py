@@ -46,11 +46,18 @@ class VectorRetriever:
         db_path: str = "~/.hawk/lancedb",
         top_k: int = 5,
         min_score: float = 0.6,
+        base_url: str = None,
+        api_key: str = None,
+        proxy: str = None,
     ):
         self.table_name = table_name
         self.db_path = os.path.expanduser(db_path)
         self.top_k = top_k
         self.min_score = min_score
+        self._base_url = base_url or os.environ.get("OPENAI_BASE_URL")
+        self._api_key = api_key or os.environ.get("OPENAI_API_KEY")
+        self._proxy = proxy or os.environ.get("OPENAI_PROXY") or os.environ.get("HTTPS_PROXY")
+        self._embedding_model = os.environ.get("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
         self._table = None
         self._openai_client = None
         self._local_model = None
@@ -70,11 +77,17 @@ class VectorRetriever:
         """延迟初始化 OpenAI 客户端"""
         if self._openai_client is not None:
             return self._openai_client
-        api_key = os.environ.get("OPENAI_API_KEY")
-        if not api_key:
-            raise RuntimeError("请设置 OPENAI_API_KEY 环境变量")
+        if not self._api_key:
+            raise RuntimeError("请设置 OPENAI_API_KEY 环境变量或传入 api_key 参数")
+
+        import httpx
+        http_client = httpx.Client(proxy=self._proxy) if self._proxy else None
         from openai import OpenAI
-        self._openai_client = OpenAI(api_key=api_key)
+        self._openai_client = OpenAI(
+            api_key=self._api_key,
+            base_url=self._base_url,
+            http_client=http_client,
+        )
         return self._openai_client
 
     def _get_local_model(self):
@@ -102,7 +115,7 @@ class VectorRetriever:
         # Fallback to OpenAI
         client = self._get_openai_client()
         resp = client.embeddings.create(
-            model="text-embedding-3-small",
+            model=self._embedding_model,
             input=texts,
         )
         return [item.embedding for item in resp.data]

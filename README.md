@@ -139,6 +139,49 @@ hawk resume                           # Resume after restart ← CORE!
 
 `summarize` · `extract` · `delete` · `promote` · `archive`
 
+### Strategy Overview
+
+| Strategy | Trigger | Action |
+|----------|---------|--------|
+| **summarize** | text > 500 chars | Compress to concise summary via LLM |
+| **extract** | any memory | Extract key facts/entities via LLM |
+| **delete** | importance < 0.3 + idle > 7 days | Permanently delete |
+| **promote** | importance ≥ 0.7 + access ≥ 5 | Upgrade short → long |
+| **archive** | tier timeout exceeded | Move to archive tier |
+
+### Usage
+
+```python
+from hawk.compression import MemoryCompressor
+
+mc = MemoryCompressor()
+
+# Single memory
+mc.summarize("mem_id_abc")
+mc.promote("mem_id_abc")
+
+# Batch
+mc.compress_all("archive")    # Archive all timed-out memories
+mc.compress_all("delete")    # Delete all candidates
+
+# Health report
+report = mc.audit()
+print(report["candidates"])
+# {'to_summarize': [...], 'to_delete': [...], 'to_promote': [...], 'to_archive': [...]}
+```
+
+### Thresholds (Configurable)
+
+| Rule | Threshold |
+|------|-----------|
+| Promote importance | ≥ 0.7 |
+| Promote access count | ≥ 5 |
+| Delete importance | < 0.3 |
+| Delete idle | > 7 days |
+| Archive working | > 24 hours |
+| Archive short | > 30 days |
+| Archive long | > 90 days |
+
 ---
 
 ## 🔔 4-Level Alert System
