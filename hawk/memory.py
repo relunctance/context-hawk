@@ -54,10 +54,20 @@ class MemoryManager:
 
     def _load(self):
         if os.path.exists(self.db_path):
-            with open(self.db_path) as f:
-                data = json.load(f)
-                for k, v in data.items():
-                    self.memories[k] = MemoryItem(**v)
+            try:
+                with open(self.db_path) as f:
+                    content = f.read()
+                    if not content.strip():
+                        return  # 空文件，正常
+                    data = json.loads(content)
+                    for k, v in data.items():
+                        self.memories[k] = MemoryItem(**v)
+            except json.JSONDecodeError as e:
+                print(f"[MemoryManager] Warning: corrupted db file {self.db_path}, resetting. Error: {e}")
+                # 备份损坏文件
+                import shutil
+                shutil.copy(self.db_path, self.db_path + ".bak")
+                self.memories = {}
 
     def _save(self):
         with open(self.db_path, 'w') as f:
