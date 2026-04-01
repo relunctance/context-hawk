@@ -175,6 +175,44 @@ hawk introspect         # Self-introspection report
 
 ---
 
+## 🔑 Jina API Key (Required for Semantic Search)
+
+Context-Hawk uses **Jina AI** for embedding generation. Jina offers a generous **free tier** that is sufficient for most use cases.
+
+### Get Your Free Jina API Key
+
+1. **Register** at https://jina.ai/ (free, no credit card required)
+2. **Navigate** to https://jina.ai/settings/ (Settings → API Keys)
+3. **Create** a new API key (click "Create API Key")
+4. **Copy** the key (starts with `jina_`)
+
+### Configure
+
+```bash
+# The installer will ask for your API key automatically
+# Or configure manually:
+mkdir -p ~/.hawk
+cat > ~/.hawk/config.json << 'EOF'
+{
+  "openai_api_key": "jina_YOUR_KEY_HERE",
+  "embedding_model": "jina-embeddings-v3",
+  "embedding_dimensions": 1024
+}
+EOF
+```
+
+> **Why "openai_api_key"?** Jina AI uses an OpenAI-compatible API format, so the config field is reused.
+
+### Free Tier Limits
+
+| | Free Tier |
+|--|-----------|
+| Embedding | 1M tokens/month |
+| Reranker | 10k tokens/month |
+|足够了 | ✅ Yes, for personal use |
+
+---
+
 ## Auto-Trigger: Every N Rounds
 
 Every **10 rounds** (default, configurable), Context-Hawk automatically:

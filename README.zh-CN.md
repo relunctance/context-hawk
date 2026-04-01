@@ -175,6 +175,43 @@ hawk introspect         # 自我反思报告
 
 ---
 
+## 🔑 Jina API Key（语义搜索必需）
+
+Context-Hawk 使用 **Jina AI** 生成向量嵌入。Jina 提供**免费额度**，足够个人使用。
+
+### 获取免费 Jina API Key
+
+1. **注册** https://jina.ai/（免费，无需信用卡）
+2. **进入** https://jina.ai/settings/（Settings → API Keys）
+3. **创建**新 API Key（点击 "Create API Key"）
+4. **复制** Key（以 `jina_` 开头）
+
+### 配置
+
+```bash
+# 安装脚本会自动询问，或手动配置：
+mkdir -p ~/.hawk
+cat > ~/.hawk/config.json << 'EOF'
+{
+  "openai_api_key": "jina_你的KEY",
+  "embedding_model": "jina-embeddings-v3",
+  "embedding_dimensions": 1024
+}
+EOF
+```
+
+> **为什么用 `openai_api_key` 字段？** Jina AI 采用 OpenAI 兼容 API 格式，所以复用该字段。
+
+### 免费额度
+
+| | 免费版 |
+|--|--------|
+| Embedding | 每月 100 万 tokens |
+| Reranker | 每月 1 万 tokens |
+| 够用吗 | ✅ 足够个人使用 |
+
+---
+
 ## 自动触发：每 N 轮
 
 每 **10 轮**（默认，可配置），Context-Hawk 自动：
