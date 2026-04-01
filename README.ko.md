@@ -43,6 +43,21 @@
 
 ---
 
+## 🚀 빠른 설치
+
+```bash
+# 원라인 설치 (권장)
+bash <(curl -fsSL https://raw.githubusercontent.com/relunctance/context-hawk/master/install.sh)
+
+# 또는 pip로 직접
+pip install context-hawk
+
+# 전체 기능 설치 (sentence-transformers 포함)
+pip install "context-hawk[all]"
+```
+
+---
+
 ## 🏗️ 아키텍처
 
 ```

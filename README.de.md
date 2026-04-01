@@ -43,6 +43,21 @@ Die meisten KI-Agenten leiden an **Amnesie** — jede neue Sitzung beginnt bei N
 
 ---
 
+## 🚀 Schnellstart
+
+```bash
+# Einzeilige Installation (empfohlen)
+bash <(curl -fsSL https://raw.githubusercontent.com/relunctance/context-hawk/master/install.sh)
+
+# Oder direkt via pip
+pip install context-hawk
+
+# Mit allen Funktionen (inkl. sentence-transformers)
+pip install "context-hawk[all]"
+```
+
+---
+
 ## 🏗️ Architektur
 
 ```

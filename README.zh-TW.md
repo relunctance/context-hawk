@@ -43,6 +43,21 @@
 
 ---
 
+## 🚀 快速安裝
+
+```bash
+# 一鍵安裝（推薦）
+bash <(curl -fsSL https://raw.githubusercontent.com/relunctance/context-hawk/master/install.sh)
+
+# 或直接用 pip
+pip install context-hawk
+
+# 安裝全部功能（含 sentence-transformers）
+pip install "context-hawk[all]"
+```
+
+---
+
 ## 🏗️ 架構
 
 ```

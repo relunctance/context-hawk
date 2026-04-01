@@ -43,6 +43,21 @@ La maggior parte degli agenti IA soffre di **amnesia** — ogni nuova sessione p
 
 ---
 
+## 🚀 Avvio Rapido
+
+```bash
+# Installazione in una riga (consigliata)
+bash <(curl -fsSL https://raw.githubusercontent.com/relunctance/context-hawk/master/install.sh)
+
+# Oppure direttamente via pip
+pip install context-hawk
+
+# Con tutte le funzionalità (inclusi sentence-transformers)
+pip install "context-hawk[all]"
+```
+
+---
+
 ## 📦 Memoria Stato Attività (Funzionalità Più Preziosa)
 
 Anche dopo riavvio, interruzione di corrente o cambio sessione, Context-Hawk riprende esattamente da dove aveva lasciato.

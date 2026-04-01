@@ -43,6 +43,21 @@
 
 ---
 
+## 🚀 クイックインストール
+
+```bash
+# ワンラインインストール（推奨）
+bash <(curl -fsSL https://raw.githubusercontent.com/relunctance/context-hawk/master/install.sh)
+
+# またはpipで直接
+pip install context-hawk
+
+# 全機能インストール（含 sentence-transformers）
+pip install "context-hawk[all]"
+```
+
+---
+
 ## 🏗️ アーキテクチャ
 
 ```

@@ -43,6 +43,21 @@ La mayoría de los agentes de IA sufren de **amnesia** — cada nueva sesión co
 
 ---
 
+## 🚀 Instalación Rápida
+
+```bash
+# Instalación en una línea (recomendado)
+bash <(curl -fsSL https://raw.githubusercontent.com/relunctance/context-hawk/master/install.sh)
+
+# O directamente via pip
+pip install context-hawk
+
+# Con todas las funciones (incluyendo sentence-transformers)
+pip install "context-hawk[all]"
+```
+
+---
+
 ## 🏗️ Arquitectura
 
 ```

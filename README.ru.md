@@ -43,6 +43,21 @@
 
 ---
 
+## 🚀 Быстрая установка
+
+```bash
+# Установка в одну строку (рекомендуется)
+bash <(curl -fsSL https://raw.githubusercontent.com/relunctance/context-hawk/master/install.sh)
+
+# Или напрямую через pip
+pip install context-hawk
+
+# Со всеми функциями (включая sentence-transformers)
+pip install "context-hawk[all]"
+```
+
+---
+
 ## 📦 Память состояния задачи (самая ценная функция)
 
 Даже после перезапуска, отключения питания или смены сессии Context-Hawk продолжает точно с того места, где остановился.

@@ -44,6 +44,21 @@ Most AI agents suffer from **amnesia** — every new session starts from zero. C
 
 ---
 
+## 🚀 Quick Install
+
+```bash
+# One-line install (recommended)
+bash <(curl -fsSL https://raw.githubusercontent.com/relunctance/context-hawk/master/install.sh)
+
+# Or via pip directly
+pip install context-hawk
+
+# With all features (including sentence-transformers)
+pip install "context-hawk[all]"
+```
+
+---
+
 ## 🏗️ Architecture
 
 ```
