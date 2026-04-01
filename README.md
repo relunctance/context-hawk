@@ -39,7 +39,8 @@ Most AI agents suffer from **amnesia** — every new session starts from zero. C
 | 7 | **Self-Introspection** | Checks task clarity, missing info, loop detection |
 | 8 | **LanceDB Vector Search** | Optional — hybrid vector + BM25 retrieval, supports sentence-transformers local embedding |
 | 9 | **Pure-Memory Fallback** | Works without LanceDB, JSONL file persistence |
-| 10 | **Auto-Dedup** | Merges duplicate memories automatically |
+| 10 | **Auto-Dedup** | SimHash-based dedup, removes duplicate memories |
+| 11 | **MMR Recall** | Maximal Marginal Relevance — diverse recall, no repetition |
 
 ---
 
@@ -135,6 +136,28 @@ hawk resume                           # Resume after restart ← CORE!
 
 ---
 
+## 🔍 MMR — Diverse Memory Recall
+
+**MMR (Maximal Marginal Relevance)** solves the "similar memories crowding out diverse ones" problem.
+
+When recalling memories, naive vector search returns the most similar — but they may all be about the same topic. MMR balances:
+
+```
+MMR = λ × Relevance(q, doc) − (1−λ) × max(Similarity(doc, already_selected))
+
+λ = 0.7: 70% relevance + 30% diversity
+```
+
+**Usage:**
+```python
+from hawk.similarity import MMR
+
+mmr = MMR(lambda_param=0.7)
+selected = mmr.select(query_vector, candidate_vectors, top_k=5)
+```
+
+---
+
 ## 🗜️ 5 Compression Strategies
 
 `summarize` · `extract` · `delete` · `promote` · `archive`
@@ -192,6 +215,32 @@ print(report["candidates"])
 | 🟡 Watch | 60-79% | Suggest compression |
 | 🔴 Critical | 80-94% | Pause auto-write, force suggestion |
 | 🚨 Danger | ≥ 95% | Block writes, must compress |
+
+---
+
+## 🧬 SimHash — Auto-Dedup
+
+**SimHash** provides fast duplicate detection for memories using Hamming distance.
+
+- Compute 64-bit fingerprint for each memory text
+- Two memories are duplicates if Hamming distance < 3
+- O(1) comparison — no need for pairwise vector search
+
+**How it works:**
+```
+Text → Tokenize → MD5 hash each token → Sum vectors → Fingerprint
+```
+
+**Usage:**
+```python
+from hawk.similarity import SimHash
+
+sh = SimHash()
+if sh.is_duplicate(new_text, existing_text, threshold=3):
+    print("Duplicate detected, skipping store")
+else:
+    print("New content, store it")
+```
 
 ---
 

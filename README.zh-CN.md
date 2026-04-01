@@ -39,7 +39,8 @@
 | 7 | **自我反思** | 检查任务清晰度、缺失信息、循环检测 |
 | 8 | **LanceDB 向量搜索** | 可选 — 混合向量 + BM25 检索，支持 sentence-transformers 本地向量 |
 | 9 | **纯记忆备份** | 无需 LanceDB，JSONL 文件持久化 |
-| 10 | **自动去重** | 自动合并重复记忆 |
+| 10 | **自动去重** | SimHash 去重，移除重复记忆 |
+| 11 | **MMR 召回** | 最大边缘相关性，多样性召回不重复 |
 
 ---
 
@@ -132,6 +133,54 @@ hawk resume               # 重启后继续 ← 核心功能！
 | **C: 最近** | 最近 10 轮 | 50% |
 | **D: Top5 召回** | `access_count` Top 5 | 70% |
 | **E: 完整** | 无过滤 | 100% |
+
+---
+
+## 🔍 MMR — 多样性召回
+
+**MMR（最大边缘相关性）** 解决"相似记忆挤占多样化记忆"的问题。
+
+传统向量搜索只返回最相似的，但可能全是同一主题。MMR 平衡相关性和多样性：
+
+```
+MMR = λ × 相关性(q, doc) − (1−λ) × 最大相似度(doc, 已选文档)
+
+λ = 0.7：70% 相关性 + 30% 多样性
+```
+
+**用法：**
+```python
+from hawk.similarity import MMR
+
+mmr = MMR(lambda_param=0.7)
+selected = mmr.select(query_vector, candidate_vectors, top_k=5)
+```
+
+---
+
+## 🧬 SimHash — 自动去重
+
+**SimHash** 通过海明距离快速判断两段记忆是否重复。
+
+- 计算每条记忆的 64 位指纹
+- 两段记忆海明距离 < 3 则认为重复
+- O(1) 比较，无需两两向量搜索
+
+**工作原理：**
+```
+文本 → 分词 → 每个词 MD5 hash → 向量相加 → 生成指纹
+```
+
+**用法：**
+```python
+from hawk.similarity import SimHash
+
+sh = SimHash()
+if sh.is_duplicate(new_text, existing_text, threshold=3):
+    print("重复，跳过存储")
+else:
+    print("新内容，存储")
+```
 
 ---
 
