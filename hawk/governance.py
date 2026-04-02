@@ -115,13 +115,18 @@ class Governance:
         """
         Learn a new noise prototype when extraction yields zero memories.
         Saves to noise_prototypes.json for next boot.
+        Caps at MAX_PROTOTYPES to prevent unbounded growth.
         """
+        MAX_PROTOTYPES = 100
         proto_path = os.path.expanduser('~/.hawk/noise_prototypes.json')
         protos = []
         if os.path.exists(proto_path):
             with open(proto_path) as f:
                 protos = json.load(f)
         protos.append({'text': text[:100], 'embedding': embedding, 'learned_at': datetime.now().isoformat()})
+        # Keep only most recent MAX_PROTOTYPES
+        if len(protos) > MAX_PROTOTYPES:
+            protos = protos[-MAX_PROTOTYPES:]
         with open(proto_path, 'w') as f:
             json.dump(protos, f)
         return len(protos)

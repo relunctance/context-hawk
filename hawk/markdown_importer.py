@@ -51,16 +51,23 @@ class MarkdownImporter:
         """扫描所有 .md 文件，按 ## 分块"""
         chunks = []
         for filepath in glob.glob(os.path.join(self.memory_dir, "*.md")):
-            if '<!-- hawk:imported -->' in open(filepath).read():
+            with open(filepath, 'r', encoding='utf-8') as f:
+                content = f.read()
+            if '<!-- hawk:imported -->' in content:
                 continue  # 增量跳过
-            chunks.extend(self._parse_file(filepath))
+            chunks.extend(self._parse_file_content(filepath, content))
         return chunks
 
-    def _parse_file(self, filepath):
-        with open(filepath, 'r', encoding='utf-8') as f:
-            content = f.read()
+    def _parse_file_content(self, filepath, content):
+        """Parse file from already-read content (avoids double-read)"""
         mtime = os.path.getmtime(filepath)
         filename = os.path.basename(filepath)
+
+    def _parse_file(self, filepath):
+        """Legacy method — kept for backward compat. Use _parse_file_content for efficiency."""
+        with open(filepath, 'r', encoding='utf-8') as f:
+            content = f.read()
+        return self._parse_file_content(filepath, content)
 
         title = ""
         m = re.search(r'^# (.+)$', content, re.MULTILINE)
@@ -152,8 +159,10 @@ class MarkdownImporter:
         for c in chunks:
             fp = os.path.join(self.memory_dir, c.source_file)
             if os.path.exists(fp):
-                with open(fp, 'a', encoding='utf-8') as f:
-                    if '<!-- hawk:imported -->' not in open(fp).read():
+                with open(fp, 'r', encoding='utf-8') as f:
+                    existing = f.read()
+                if '<!-- hawk:imported -->' not in existing:
+                    with open(fp, 'a', encoding='utf-8') as f:
                         f.write(f"\n<!-- hawk:imported {datetime.now().date()} -->\n")
 
         return len(chunks)

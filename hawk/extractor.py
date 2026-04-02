@@ -144,13 +144,24 @@ def extract_with_keyword(conversation_text: str) -> list[ExtractedMemory]:
     Zero-dependency keyword-based extraction.
     No API key needed — works completely offline.
     Uses pattern matching to identify important statements.
+
+    Keywords are configurable via HAWK_KEYWORD_* env vars (comma-separated).
+    Defaults work for Chinese; set HAWK_KEYWORD_LANG=en for English.
     """
+    # Configurable via env vars; comma-separated strings
+    _kw_fact = os.environ.get('HAWK_KEYWORD_FACT', '是,叫,名字是,在,位于,等于')
+    _kw_pref = os.environ.get('HAWK_KEYWORD_PREF', '喜欢,希望,想要,倾向,偏好,不要,拒绝')
+    _kw_dec = os.environ.get('HAWK_KEYWORD_DEC', '决定,选择,要用,采用,做,开始,停止,不买')
+    _kw_ent = os.environ.get('HAWK_KEYWORD_ENT', '周,老板,老周,悟空,唐僧,趣近,取经')
+    _kw_skip = os.environ.get('HAWK_KEYWORD_SKIP', '好的,收到,嗯,哈哈,ok,OK,了解,没问题,✅,👍')
+
     CATEGORIES = {
-        'fact': ['是', '等于', '等于', '叫', '名字是', '在', '位于'],
-        'preference': ['喜欢', '希望', '想要', '倾向', '偏好', '不要', '拒绝'],
-        'decision': ['决定', '选择', '要用', '采用', '做', '开始', '停止', '不买', '不买了'],
-        'entity': ['周', '老板', '老周', '悟空', '唐僧', '趣近', '取经', '公司', '项目'],
+        'fact': _kw_fact.split(','),
+        'preference': _kw_pref.split(','),
+        'decision': _kw_dec.split(','),
+        'entity': _kw_ent.split(','),
     }
+    SKIP_WORDS = _kw_skip.split(',')
 
     lines = conversation_text.strip().split('\n')
     results = []
@@ -161,8 +172,7 @@ def extract_with_keyword(conversation_text: str) -> list[ExtractedMemory]:
         if len(line) < 5:
             continue
         # Skip greetings and acknowledgements
-        skip_words = ['好的', '收到', '嗯', '哈哈', 'ok', 'OK', '了解', '没问题', '✅', '👍']
-        if any(line.startswith(w) or line in skip_words for w in skip_words):
+        if any(line.startswith(w) or line in SKIP_WORDS for w in SKIP_WORDS):
             continue
 
         # Categorize
