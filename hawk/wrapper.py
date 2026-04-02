@@ -27,6 +27,17 @@ from .vector_retriever import VectorRetriever
 from .extractor import extract_memories
 from .governance import Governance
 
+# ─── Tunable generation parameters ─────────────────────────────────────────────
+
+GENERATION_TEMPERATURE = float(os.environ.get('HAWK_GENERATION_TEMPERATURE', '0.7'))
+"""
+Temperature for chat generation (distinct from EXTRACTION_TEMPERATURE).
+Range: 0.0–1.0. Default 0.7.
+- 0.0–0.3 = focused/deterministic
+- 0.5–0.8 = balanced/conversational
+- 0.8+ = creative/exploratory
+"""
+
 
 @dataclass
 class HawkConfig:
@@ -233,7 +244,7 @@ class HawkContext:
                 "model": self.cfg.model,
                 "messages": messages,
                 "max_tokens": 2000,
-                "temperature": 0.7,
+                "temperature": GENERATION_TEMPERATURE,
             }
             req = urllib.request.Request(
                 chat_url,
@@ -276,7 +287,7 @@ class HawkContext:
         data = {
             "model": self.cfg.model or "llama-3.3-70b-versatile",
             "messages": messages,
-            "temperature": 0.7,
+            "temperature": GENERATION_TEMPERATURE,
             "max_tokens": 2000,
         }
         req = urllib.request.Request(

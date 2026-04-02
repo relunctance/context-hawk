@@ -22,9 +22,20 @@ from typing import TypedDict
 try:
     from .memory import MemoryManager, MemoryItem
     from .extractor import extract_memories
+    from .config import (
+        IMPORTANCE_THRESHOLD_LOW, SUMMARY_MAX_CHARS, WORKING_TTL_DAYS,
+        SHORT_TTL_DAYS, LONG_TTL_DAYS, COMPRESS_RATIO_THRESHOLD,
+    )
 except ImportError:
     from memory import MemoryManager, MemoryItem
     from extractor import extract_memories
+    # Fallback defaults (must match hawk/config.py)
+    IMPORTANCE_THRESHOLD_LOW = 0.3
+    SUMMARY_MAX_CHARS = 200
+    WORKING_TTL_DAYS = 1
+    SHORT_TTL_DAYS = 7
+    LONG_TTL_DAYS = 90
+    COMPRESS_RATIO_THRESHOLD = 0.5
 
 
 class CompressionResult(TypedDict):
@@ -40,19 +51,22 @@ class MemoryCompressor:
     配合 MemoryManager 使用，对记忆进行压缩/提升/删除/归档
     """
 
-    # 触发阈值
-    PROMOTE_IMPORTANCE_THRESHOLD = 0.7
-    PROMOTE_ACCESS_COUNT_THRESHOLD = 5
+    # Thresholds (imported from hawk/config.py with docstrings)
+    # PROMOTE_IMPORTANCE_THRESHOLD: importance >= this → promote to long
+    # DELETE_IMPORTANCE_THRESHOLD: importance < this AND old → delete
+    # ARCHIVE_SHORT_DAYS: short-layer memories older than this → archive
+    # ARCHIVE_LONG_DAYS: long-layer memories older than this → archive
+    # ARCHIVE_WORKING_HOURS: working-layer memories older than this → demote
+    PROMOTE_IMPORTANCE_THRESHOLD = 0.7   # tune via HAWK_IMPORTANCE_HIGH
+    PROMOTE_ACCESS_COUNT_THRESHOLD = 5     # promote after 5+ accesses
+    DELETE_IMPORTANCE_THRESHOLD = IMPORTANCE_THRESHOLD_LOW  # from config.py
+    DELETE_MAX_AGE_DAYS = 7               # days before eligible for deletion
+    ARCHIVE_SHORT_DAYS = SHORT_TTL_DAYS * 4    # ~4× short TTL
+    ARCHIVE_LONG_DAYS = LONG_TTL_DAYS           # match long TTL
+    ARCHIVE_WORKING_HOURS = WORKING_TTL_DAYS * 24  # convert days to hours
 
-    DELETE_IMPORTANCE_THRESHOLD = 0.3
-    DELETE_MAX_AGE_DAYS = 7  # 超过7天且importance < 0.3才删
-
-    ARCHIVE_SHORT_DAYS = 30   # short层超过30天
-    ARCHIVE_LONG_DAYS = 90    # long层超过90天
-    ARCHIVE_WORKING_HOURS = 24  # working层超过24小时
-
-    # 摘要长度限制
-    SUMMARY_MAX_CHARS = 200
+    # 摘要长度限制 (from config.py)
+    SUMMARY_MAX_CHARS = SUMMARY_MAX_CHARS
 
     def __init__(self, db_path: str = "~/.hawk/memories.json"):
         self.db_path = os.path.expanduser(db_path)

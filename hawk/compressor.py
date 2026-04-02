@@ -11,6 +11,11 @@ import os
 import tiktoken
 from typing import TypedDict
 
+try:
+    from hawk.config import COMPRESS_RATIO_THRESHOLD
+except ImportError:
+    COMPRESS_RATIO_THRESHOLD = 0.5
+
 
 class CompressionResult(TypedDict):
     compressed: str
@@ -114,7 +119,7 @@ class ContextCompressor:
         kept_tokens = sum(self.count_tokens(m.get("content", "")) for m in kept)
 
         # 如果还不够，从头加回来直到满
-        if kept_tokens < max_tokens * 0.5:
+        if kept_tokens < max_tokens * COMPRESS_RATIO_THRESHOLD:
             for msg in conversation:
                 if len(kept) == len(conversation):
                     break

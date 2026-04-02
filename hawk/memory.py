@@ -11,9 +11,27 @@ memory.py — 四层记忆管理器（Working/Short/Long/Archive）
 import os
 import time
 import json
+import hashlib
 from dataclasses import dataclass, asdict
 from typing import Optional
 from pathlib import Path
+
+# Import tunable constants (see hawk/config.py for documentation)
+try:
+    from hawk.config import (
+        DECAY_RATE, WORKING_TTL_DAYS, SHORT_TTL_DAYS, LONG_TTL_DAYS, ARCHIVE_TTL_DAYS,
+        IMPORTANCE_THRESHOLD_LOW, IMPORTANCE_THRESHOLD_HIGH, RECALL_MIN_SCORE,
+    )
+except ImportError:
+    # Fallback if hawk.config not available (standalone use)
+    DECAY_RATE = 0.95
+    WORKING_TTL_DAYS = 1
+    SHORT_TTL_DAYS = 7
+    LONG_TTL_DAYS = 90
+    ARCHIVE_TTL_DAYS = 180
+    IMPORTANCE_THRESHOLD_LOW = 0.3
+    IMPORTANCE_THRESHOLD_HIGH = 0.8
+    RECALL_MIN_SCORE = 0.6
 
 
 @dataclass
@@ -39,12 +57,12 @@ class MemoryManager:
 
     LAYERS = ['working', 'short', 'long', 'archive']
     LAYER_THRESHOLDS = {
-        'working': 0,      # 始终在working
-        'short': 3,        # 访问≥3次或importance≥0.6
-        'long': 10,        # 访问≥10次或importance≥0.8
-        'archive': 100,    # 长期休眠
+        'working': 0,          # always working initially
+        'short': 3,            # promote after 3+ accesses
+        'long': 10,            # promote after 10+ accesses
+        'archive': 100,        # inactive threshold
     }
-    DECAY_RATE = 0.95  # Weibull衰减率
+    DECAY_RATE = DECAY_RATE  # from config.py
 
     def __init__(self, db_path: str = "~/.hawk/memories.json"):
         self.db_path = os.path.expanduser(db_path)
@@ -121,28 +139,32 @@ class MemoryManager:
         return m
 
     def _compute_layer(self, importance: float, access_count: int) -> str:
-        if access_count >= self.LAYER_THRESHOLDS['long'] or importance >= 0.8:
+        # IMPORTANCE_THRESHOLD_HIGH: promote to long immediately if above this
+        # IMPORTANCE_THRESHOLD_LOW: demote to archive if below this
+        if access_count >= self.LAYER_THRESHOLDS['long'] or importance >= IMPORTANCE_THRESHOLD_HIGH:
             return 'long'
-        elif access_count >= self.LAYER_THRESHOLDS['short'] or importance >= 0.6:
+        elif access_count >= self.LAYER_THRESHOLDS['short'] or importance >= IMPORTANCE_THRESHOLD_HIGH * 0.75:
+            # short: moderate importance OR repeated access
             return 'short'
-        elif importance < 0.3:
+        elif importance < IMPORTANCE_THRESHOLD_LOW:
             return 'archive'
         return 'working'
 
     def decay(self):
-        """所有记忆衰减，更新层级， archive 超过180天删除"""
+        """所有记忆衰减，更新层级， archive 超过ARCHIVE_TTL_DAYS天删除"""
         now = time.time()
         changed = False
         to_delete = []
 
         for m in self.memories.values():
             if m.layer == 'archive':
-                if now - m.last_accessed > 180 * 86400:
+                # ARCHIVE_TTL_DAYS: delete after this long of no access
+                if now - m.last_accessed > ARCHIVE_TTL_DAYS * 86400:
                     to_delete.append(m.id)
                 continue
-            # Weibull衰减
+            # DECAY_RATE: daily decay multiplier applied per idle day
             days_idle = max(0, int(now - m.last_accessed) // 86400)
-            m.importance *= (self.DECAY_RATE ** days_idle)
+            m.importance *= (DECAY_RATE ** days_idle)
             changed = True
             # 降级（通过 _compute_layer 统一判断）
             new_layer = self._compute_layer(m.importance, m.access_count)

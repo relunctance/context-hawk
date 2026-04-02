@@ -22,6 +22,29 @@ import os
 import argparse
 from typing import TypedDict
 
+# ─── Tunable extraction parameters ─────────────────────────────────────────────
+# Override via environment variables
+
+EXTRACTION_TEMPERATURE = float(os.environ.get('HAWK_EXTRACTION_TEMPERATURE', '0.1'))
+"""
+LLM temperature for memory extraction.
+Range: 0.0–1.0. Default 0.1.
+- 0.0 = deterministic, best for extraction (factual consistency)
+- Lower is better for extraction where factual accuracy matters more than variety.
+"""
+
+EXTRACTION_MAX_TOKENS = int(os.environ.get('HAWK_EXTRACTION_MAX_TOKENS', '2000'))
+"""
+Max tokens for LLM extraction response.
+Default 2000. Increase if extracting very long memories.
+"""
+
+IMPORTANCE_KEYWORD_DEFAULT = float(os.environ.get('HAWK_IMPORTANCE_KEYWORD', '0.7'))
+"""
+Default importance for keyword-mode extraction when a keyword match is found.
+Range: 0.0–1.0. Default 0.7.
+"""
+
 
 class ExtractedMemory(TypedDict):
     text: str
@@ -182,7 +205,7 @@ def extract_with_keyword(conversation_text: str) -> list[ExtractedMemory]:
             for kw in keywords:
                 if kw in line:
                     category = cat
-                    importance = 0.7
+                    importance = IMPORTANCE_KEYWORD_DEFAULT
                     break
 
         # Skip low-value lines
@@ -215,7 +238,7 @@ def extract_with_openai(prompt: str, api_key: str, model: str) -> list[Extracted
             {"role": "system", "content": "你是一个精确的记忆提取引擎。只输出JSON数组，不输出任何其他内容。"},
             {"role": "user", "content": prompt}
         ],
-        temperature=0.1,
+        temperature=EXTRACTION_TEMPERATURE,
         max_tokens=2000,
     )
     return parse_and_validate(response.choices[0].message.content)
@@ -234,7 +257,7 @@ def extract_with_groq(prompt: str, api_key: str, model: str) -> list[ExtractedMe
                 {"role": "system", "content": "你是一个精确的记忆提取引擎。只输出JSON数组，不输出任何其他内容。"},
                 {"role": "user", "content": prompt}
             ],
-            "temperature": 0.1,
+            "temperature": EXTRACTION_TEMPERATURE,
             "max_tokens": 2000,
         }).encode()
         req = urllib.request.Request(
@@ -257,7 +280,7 @@ def extract_with_groq(prompt: str, api_key: str, model: str) -> list[ExtractedMe
             {"role": "system", "content": "你是一个精确的记忆提取引擎。只输出JSON数组，不输出任何其他内容。"},
             {"role": "user", "content": prompt}
         ],
-        temperature=0.1,
+        temperature=EXTRACTION_TEMPERATURE,
         max_tokens=2000,
     )
     return parse_and_validate(response.choices[0].message.content)
@@ -294,7 +317,7 @@ def extract_with_openrouter(prompt: str, api_key: str, model: str) -> list[Extra
             {"role": "system", "content": "你是一个精确的记忆提取引引擎。只输出JSON数组，不输出任何其他内容。"},
             {"role": "user", "content": prompt}
         ],
-        "temperature": 0.1,
+        "temperature": EXTRACTION_TEMPERATURE,
         "max_tokens": 2000,
     }).encode()
     req = urllib.request.Request(
@@ -329,7 +352,7 @@ def extract_with_openclaw(prompt: str, api_key: str, model: str, base_url: str) 
                 {"role": "system", "content": "你是一个精确的记忆提取引擎。只输出JSON数组，不输出任何其他内容。"},
                 {"role": "user", "content": prompt}
             ],
-            "temperature": 0.1,
+            "temperature": EXTRACTION_TEMPERATURE,
             "max_tokens": 2000,
         }).encode()
         req = urllib.request.Request(
@@ -354,7 +377,7 @@ def extract_with_openclaw(prompt: str, api_key: str, model: str, base_url: str) 
             {"role": "system", "content": "你是一个精确的记忆提取引擎。只输出JSON数组，不输出任何其他内容。"},
             {"role": "user", "content": prompt}
         ],
-        temperature=0.1,
+        temperature=EXTRACTION_TEMPERATURE,
         max_tokens=2000,
     )
     return parse_and_validate(response.choices[0].message.content)
