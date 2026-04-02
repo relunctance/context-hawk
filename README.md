@@ -40,7 +40,31 @@ Most AI agents suffer from **amnesia** — every new session starts from zero. C
 
 ---
 
-## ✨ 10 Core Features
+## 🎯 5 Core Problems It Solves
+
+**Problem 1: Session context window limits**
+Context has a token limit (e.g. 32k). Long history crowds out important content.
+→ Context-Hawk compresses/archives old content, injects only the most relevant memories.
+
+**Problem 2: AI forgets across sessions**
+When a session ends, context disappears. Next conversation starts fresh.
+→ Memories are stored persistently; `hawk recall` retrieves relevant ones for the next session.
+
+**Problem 3: Multiple agents share nothing**
+Agent A knows nothing about Agent B's context. Decisions made by one agent are invisible to others.
+→ Shared LanceDB memory store (when used with hawk-bridge): all agents read/write to the same store. No silos.
+
+**Problem 4: Context grows too large before sending to LLM**
+Recall without optimization = large, repetitive context.
+→ After compression + SimHash dedup + MMR: context is **much smaller** before LLM is called, saving tokens and cost.
+
+**Problem 5: Memory never self-manages**
+Without management: all messages pile up until context overflows.
+→ Auto-extraction → importance scoring → 4-tier decay. Unimportant → delete. Important → promote to long-term.
+
+---
+
+## ✨ 12 Core Features
 
 | # | Feature | Description |
 |---|---------|-------------|
@@ -55,6 +79,7 @@ Most AI agents suffer from **amnesia** — every new session starts from zero. C
 | 9 | **Pure-Memory Fallback** | Works without LanceDB, JSONL file persistence |
 | 10 | **Auto-Dedup** | SimHash-based dedup, removes duplicate memories |
 | 11 | **MMR Recall** | Maximal Marginal Relevance — diverse recall, no repetition |
+| 12 | **6-Category Extraction** | LLM-powered extraction: fact / preference / decision / entity / task / other |
 
 ---
 
@@ -277,7 +302,7 @@ else:
 
 ```bash
 # One-command install (recommended — auto-installs all dependencies)
-bash <(curl -fsSL https://raw.githubusercontent.com/relunctance/hawk-bridge/master/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/relunctance/context-hawk/master/install.sh)
 
 # Activate skill
 openclaw skills install ./context-hawk.skill
@@ -296,28 +321,55 @@ hawk introspect         # Self-introspection report
 
 ---
 
-## 🔑 Jina API Key (Required for Semantic Search)
+## 📊 Embedding Providers & Graceful Degradation
 
-Context-Hawk uses **Jina AI** for embedding generation. Jina offers a generous **free tier** that is sufficient for most use cases.
+Context-Hawk works **out of the box without any API key**, and scales up to cloud embeddings when you need higher quality.
 
-### Get Your Free Jina API Key
+### 🔄 Degradation Logic
 
-1. **Register** at https://jina.ai/ (free, no credit card required)
-2. **Navigate** to https://jina.ai/settings/ (Settings → API Keys)
-3. **Create** a new API key (click "Create API Key")
-4. **Copy** the key (starts with `jina_`)
+Context-Hawk auto-detects what's available and degrades gracefully:
 
-### Configure
+```
+Has OLLAMA_BASE_URL?       → Full hybrid: vector + BM25 + RRF
+Has USE_LOCAL_EMBEDDING=1? → sentence-transformers + BM25 + RRF
+Has JINA_API_KEY?          → Jina embeddings + BM25 + RRF
+Has MINIMAX_API_KEY?      → Minimax embeddings + BM25 + RRF
+Nothing configured?        → BM25-only (pure keyword, no API calls)
+```
 
+**No API key = no crash.** It always works — even with zero configuration.
+
+### 📊 Provider Comparison
+
+| Provider | API Key | Quality | Speed | Best For |
+|----------|---------|---------|-------|----------|
+| **BM25-only** | ❌ | ⭐⭐ | ⚡⚡⚡ | Zero-config, offline |
+| **sentence-transformers** | ❌ | ⭐⭐⭐ | ⚡⚡ | Local CPU, privacy-first |
+| **Ollama** | ❌ | ⭐⭐⭐⭐ | ⚡⚡⚡⚡ | Local GPU, free |
+| **Jina AI** | ✅ free | ⭐⭐⭐⭐ | ⚡⚡⚡⚡ | Free tier, good quality |
+| **Minimax** | ✅ | ⭐⭐⭐⭐⭐ | ⚡⚡⚡⚡⚡ | Production, highest quality |
+
+### 🔑 Jina API Key (Recommended Free Option)
+
+Jina AI offers a **generous free tier** — 1M embedding tokens/month, no credit card required.
+
+**Get Your Free Key:**
+1. **Register** at https://jina.ai/ (GitHub login supported)
+2. **Get Key**: https://jina.ai/settings/ → API Keys → Create API Key
+3. **Copy**: starts with `jina_`
+
+> ⚠️ **China users**: `api.jina.ai` is blocked. Set `HTTPS_PROXY` to your proxy URL.
+
+**Configure:**
 ```bash
-# The installer will ask for your API key automatically
-# Or configure manually:
 mkdir -p ~/.hawk
 cat > ~/.hawk/config.json << 'EOF'
 {
   "openai_api_key": "jina_YOUR_KEY_HERE",
   "embedding_model": "jina-embeddings-v3",
-  "embedding_dimensions": 1024
+  "embedding_dimensions": 1024,
+  "base_url": "https://api.jina.ai/v1",
+  "proxy": "http://YOUR_PROXY_HOST:PORT"
 }
 EOF
 ```
@@ -379,10 +431,15 @@ context-hawk/
 
 ## 🔌 Tech Specs
 
-- **Persistence**: JSONL local files, no database required
-- **Vector Search**: LanceDB (optional) + sentence-transformers local embedding, auto-fallback to files
-- **Cross-Agent**: Universal, no business logic, works with any AI agent
-- **Zero-Config**: Works out-of-the-box with smart defaults
+| | |
+|---|---|
+| **Persistence** | JSONL local files, no database required |
+| **Vector Search** | LanceDB (optional) + sentence-transformers local embedding, auto-fallback to files |
+| **Retrieval** | BM25 + ANN vector search + RRF fusion |
+| **Embedding Providers** | Ollama / sentence-transformers / Jina AI / Minimax / OpenAI |
+| **Cross-Agent** | Universal, no business logic, works with any AI agent |
+| **Zero-Config** | Works out-of-the-box with smart defaults (BM25-only mode) |
+| **Python** | 3.12+ |
 - **Extensible**: Custom injection strategies, compression policies, scoring rules
 
 ---

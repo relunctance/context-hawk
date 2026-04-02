@@ -40,7 +40,31 @@
 
 ---
 
-## ✨ 10 个核心功能
+## 🎯 它解决哪 5 个核心问题
+
+**问题 1：上下文窗口限制**
+上下文有 token 上限（如 32k）。长对话历史会把重要内容挤出去。
+→ Context-Hawk 压缩/归档旧内容，只注入最相关的记忆。
+
+**问题 2：跨 session 失忆**
+session 结束后，上下文消失。下次对话从零开始。
+→ 记忆持久化存储；`hawk recall` 在下次 session 时检索相关记忆。
+
+**问题 3：多 Agent 互不通信息**
+Agent A 不知道 Agent B 的上下文。某个 agent 做的决定对其他 agent 不可见。
+→ 共享 LanceDB 记忆库（配合 hawk-bridge 使用）：所有 agent 读写同一份记忆，无信息孤岛。
+
+**问题 4：发送给 LLM 前上下文已膨胀**
+不加优化的召回 = 大量重复的上下文。
+→ 经过压缩 + SimHash 去重 + MMR 召回：发送给 LLM 的上下文**大幅缩小**，节省 token 和费用。
+
+**问题 5：记忆从不自我管理**
+没有管理机制：所有消息堆积，直到上下文溢出。
+→ 自动提取 → 重要性评分 → 四层衰减。不重要 → 删除。重要 → 晋升为长期记忆。
+
+---
+
+## ✨ 12 个核心功能
 
 | # | 功能 | 说明 |
 |---|---------|-------|
@@ -55,6 +79,7 @@
 | 9 | **纯记忆备份** | 无需 LanceDB，JSONL 文件持久化 |
 | 10 | **自动去重** | SimHash 去重，移除重复记忆 |
 | 11 | **MMR 召回** | 最大边缘相关性，多样性召回不重复 |
+| 12 | **6 类提取引擎** | LLM 驱动的分类提取：事实 / 偏好 / 决策 / 实体 / 任务 / 其他 |
 
 ---
 
@@ -298,27 +323,55 @@ hawk introspect         # 自我反思报告
 
 ---
 
-## 🔑 Jina API Key（语义搜索必需）
+## 📊 Embedding 提供商 & 优雅降级
 
-Context-Hawk 使用 **Jina AI** 生成向量嵌入。Jina 提供**免费额度**，足够个人使用。
+Context-Hawk **零配置即可开箱使用**，需要时再切换到云端 embedding 获得更高质量。
 
-### 获取免费 Jina API Key
+### 🔄 降级逻辑
 
-1. **注册** https://jina.ai/（免费，无需信用卡）
-2. **进入** https://jina.ai/settings/（Settings → API Keys）
-3. **创建**新 API Key（点击 "Create API Key"）
-4. **复制** Key（以 `jina_` 开头）
+Context-Hawk 自动检测可用资源，优雅降级：
 
-### 配置
+```
+配置了 OLLAMA_BASE_URL？      → 完整混合检索：向量 + BM25 + RRF
+配置了 USE_LOCAL_EMBEDDING=1？ → sentence-transformers + BM25 + RRF
+配置了 JINA_API_KEY？         → Jina embeddings + BM25 + RRF
+配置了 MINIMAX_API_KEY？      → Minimax embeddings + BM25 + RRF
+什么都没配置？                 → 纯 BM25（关键词检索，零 API 调用）
+```
 
+**没有 API Key 也不会崩溃。** 零配置照样跑。
+
+### 📊 各提供商对比
+
+| 提供商 | API Key | 质量 | 速度 | 适用场景 |
+|----------|---------|---------|-------|----------|
+| **纯 BM25** | ❌ | ⭐⭐ | ⚡⚡⚡ | 零配置、离线 |
+| **sentence-transformers** | ❌ | ⭐⭐⭐ | ⚡⚡ | 本地 CPU，隐私优先 |
+| **Ollama** | ❌ | ⭐⭐⭐⭐ | ⚡⚡⚡⚡ | 本地 GPU，免费 |
+| **Jina AI** | ✅ 免费 | ⭐⭐⭐⭐ | ⚡⚡⚡⚡ | 免费额度，质量好 |
+| **Minimax** | ✅ | ⭐⭐⭐⭐⭐ | ⚡⚡⚡⚡⚡ | 生产环境，最高品质 |
+
+### 🔑 Jina API Key（推荐免费方案）
+
+Jina AI 提供**免费额度** — 每月 100 万 embedding tokens，无需信用卡。
+
+**获取免费 Key：**
+1. **注册** https://jina.ai/（支持 GitHub 登录）
+2. **获取 Key**：https://jina.ai/settings/ → API Keys → Create API Key
+3. **复制**：以 `jina_` 开头
+
+> ⚠️ **中国用户**：`api.jina.ai` 被墙。需设置 `HTTPS_PROXY` 为你的代理 URL。
+
+**配置：**
 ```bash
-# 安装脚本会自动询问，或手动配置：
 mkdir -p ~/.hawk
 cat > ~/.hawk/config.json << 'EOF'
 {
   "openai_api_key": "jina_你的KEY",
   "embedding_model": "jina-embeddings-v3",
-  "embedding_dimensions": 1024
+  "embedding_dimensions": 1024,
+  "base_url": "https://api.jina.ai/v1",
+  "proxy": "http://你的代理:端口"
 }
 EOF
 ```
@@ -380,11 +433,15 @@ context-hawk/
 
 ## 🔌 技术规格
 
-- **持久化**: JSONL 本地文件，无需数据库
-- **向量搜索**: LanceDB（可选）+ sentence-transformers 本地向量，自动回退到文件
-- **跨 Agent**: 通用，无业务逻辑，适用于任何 AI agent
-- **零配置**: 开箱即用，智能默认值
-- **可扩展**: 自定义注入策略、压缩策略、评分规则
+| | |
+|---|---|
+| **持久化** | JSONL 本地文件，无需数据库 |
+| **向量搜索** | LanceDB（可选）+ sentence-transformers 本地向量，自动回退到文件 |
+| **检索** | BM25 + ANN 向量搜索 + RRF 融合 |
+| **Embedding 提供商** | Ollama / sentence-transformers / Jina AI / Minimax / OpenAI |
+| **跨 Agent** | 通用，无业务逻辑，适用于任何 AI agent |
+| **零配置** | 开箱即用，智能默认值（BM25-only 模式） |
+| **Python** | 3.12+ |
 
 ---
 
