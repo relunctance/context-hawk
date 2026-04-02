@@ -12,6 +12,7 @@ import os
 import time
 import json
 import hashlib
+import threading
 from dataclasses import dataclass, asdict
 from typing import Optional
 from pathlib import Path
@@ -68,9 +69,14 @@ class MemoryManager:
         self.db_path = os.path.expanduser(db_path)
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self.memories: dict[str, MemoryItem] = {}
+        self._lock = threading.RLock()  # protects self.memories during concurrent access
         self._load()
 
     def _load(self):
+        with self._lock:
+            self._load_unlocked()
+
+    def _load_unlocked(self):
         if os.path.exists(self.db_path):
             try:
                 with open(self.db_path) as f:
@@ -88,24 +94,29 @@ class MemoryManager:
                 self.memories = {}
 
     def _save(self):
+        with self._lock:
+            self._save_unlocked()
+
+    def _save_unlocked(self):
         with open(self.db_path, 'w') as f:
             json.dump({k: asdict(v) for k, v in self.memories.items()}, f, ensure_ascii=False)
 
     def store(self, text: str, category: str = "other", importance: float = 0.5, metadata: dict = None) -> str:
         """存入记忆，自动判断层级"""
         import hashlib
-        id = hashlib.sha256(f"{text[:100]}{time.time()}".encode()).hexdigest()[:16]
-        now = time.time()
-        layer = self._compute_layer(importance, 0)
-        item = MemoryItem(
-            id=id, text=text, category=category,
-            importance=importance, access_count=0,
-            last_accessed=now, created_at=now,
-            layer=layer, metadata=metadata or {}
-        )
-        self.memories[id] = item
-        self._save()
-        return id
+        with self._lock:
+            id = hashlib.sha256(f"{text[:100]}{time.time()}".encode()).hexdigest()[:16]
+            now = time.time()
+            layer = self._compute_layer(importance, 0)
+            item = MemoryItem(
+                id=id, text=text, category=category,
+                importance=importance, access_count=0,
+                last_accessed=now, created_at=now,
+                layer=layer, metadata=metadata or {}
+            )
+            self.memories[id] = item
+            self._save_unlocked()
+            return id
 
     def recall(self, query: str, top_k: int = 5) -> list[MemoryItem]:
         """简单关键词检索记忆（配合VectorRetriever做语义检索）"""
@@ -126,17 +137,18 @@ class MemoryManager:
 
     def access(self, id: str) -> Optional[MemoryItem]:
         """访问一条记忆，更新计数器"""
-        if id not in self.memories:
-            return None
-        m = self.memories[id]
-        m.access_count += 1
-        m.last_accessed = time.time()
-        # 检查是否需要升级层级
-        new_layer = self._compute_layer(m.importance, m.access_count)
-        if self.LAYERS.index(new_layer) > self.LAYERS.index(m.layer):
-            m.layer = new_layer
-        self._save()
-        return m
+        with self._lock:
+            if id not in self.memories:
+                return None
+            m = self.memories[id]
+            m.access_count += 1
+            m.last_accessed = time.time()
+            # 检查是否需要升级层级
+            new_layer = self._compute_layer(m.importance, m.access_count)
+            if self.LAYERS.index(new_layer) > self.LAYERS.index(m.layer):
+                m.layer = new_layer
+            self._save_unlocked()
+            return m
 
     def _compute_layer(self, importance: float, access_count: int) -> str:
         # IMPORTANCE_THRESHOLD_HIGH: promote to long immediately if above this
@@ -152,31 +164,32 @@ class MemoryManager:
 
     def decay(self):
         """所有记忆衰减，更新层级， archive 超过ARCHIVE_TTL_DAYS天删除"""
-        now = time.time()
-        changed = False
-        to_delete = []
+        with self._lock:
+            now = time.time()
+            changed = False
+            to_delete = []
 
-        for m in self.memories.values():
-            if m.layer == 'archive':
-                # ARCHIVE_TTL_DAYS: delete after this long of no access
-                if now - m.last_accessed > ARCHIVE_TTL_DAYS * 86400:
-                    to_delete.append(m.id)
-                continue
-            # DECAY_RATE: daily decay multiplier applied per idle day
-            days_idle = max(0, int(now - m.last_accessed) // 86400)
-            m.importance *= (DECAY_RATE ** days_idle)
-            changed = True
-            # 降级（通过 _compute_layer 统一判断）
-            new_layer = self._compute_layer(m.importance, m.access_count)
-            if self.LAYERS.index(new_layer) < self.LAYERS.index(m.layer):
-                m.layer = new_layer
+            for m in self.memories.values():
+                if m.layer == 'archive':
+                    # ARCHIVE_TTL_DAYS: delete after this long of no access
+                    if now - m.last_accessed > ARCHIVE_TTL_DAYS * 86400:
+                        to_delete.append(m.id)
+                    continue
+                # DECAY_RATE: daily decay multiplier applied per idle day
+                days_idle = max(0, int(now - m.last_accessed) // 86400)
+                m.importance *= (DECAY_RATE ** days_idle)
+                changed = True
+                # 降级（通过 _compute_layer 统一判断）
+                new_layer = self._compute_layer(m.importance, m.access_count)
+                if self.LAYERS.index(new_layer) < self.LAYERS.index(m.layer):
+                    m.layer = new_layer
 
-        for id in to_delete:
-            del self.memories[id]
-            changed = True
+            for id in to_delete:
+                del self.memories[id]
+                changed = True
 
-        if changed:
-            self._save()
+            if changed:
+                self._save_unlocked()
 
     def count(self) -> dict:
         return {layer: sum(1 for m in self.memories.values() if m.layer == layer) for layer in self.LAYERS}

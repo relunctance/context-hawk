@@ -165,7 +165,7 @@ class Config:
                      'long_ttl_days', 'archive_ttl_days', 'embedding_dimensions'}
         _float_keys = {'decay_rate', 'recall_min_score', 'capture_importance_threshold',
                        'importance_threshold_low', 'importance_threshold_high', 'compress_ratio_threshold',
-                       'summary_max_chars', 'embedding_dimensions'}
+                       'summary_max_chars'}
         for env_key in os.environ:
             if env_key.startswith('HAWK_'):
                 config_key = env_key[len('HAWK_'):].lower()

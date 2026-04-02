@@ -66,7 +66,12 @@ class VectorRetriever:
         """延迟初始化 LanceDB 表"""
         if self._table is not None:
             return self._table
-        import lancedb
+        try:
+            import lancedb
+        except ImportError:
+            raise RuntimeError(
+                "LanceDB not installed. Install with: pip install lancedb"
+            )
         db = lancedb.connect(self.db_path)
         if self.table_name not in db.table_names():
             return None
