@@ -124,7 +124,9 @@ class ContextCompressor:
                         kept.append(msg)
                         kept_tokens += msg_tokens
 
-        kept.sort(key=lambda m: conversation.index(m))
+        # Preserve original conversation order (use position map to avoid O(n²) list.index())
+        position_map = {id(m): i for i, m in enumerate(conversation)}
+        kept.sort(key=lambda m: position_map[id(m)])
         original_tokens = sum(self.count_tokens(m.get("content", "")) for m in conversation)
 
         return CompressionResult(

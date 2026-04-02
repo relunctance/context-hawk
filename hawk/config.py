@@ -38,16 +38,21 @@ class Config:
         self._load()
 
     def _load(self):
-        # 环境变量覆盖
-        for key in ["OPENAI_API_KEY", "HAWK_DB_PATH", "HAWK_EMBEDDING_MODEL"]:
-            if key in os.environ:
-                self._config[key.lower()] = os.environ[key]
-
-        # 配置文件
+        # 配置文件（用户配置优先于默认值）
         if os.path.exists(self.config_path):
             with open(self.config_path) as f:
                 user_config = json.load(f)
                 self._config.update(user_config)
+
+        # 环境变量覆盖（最高优先级）
+        env_mappings = {
+            "OPENAI_API_KEY": "openai_api_key",
+            "HAWK_DB_PATH": "db_path",
+            "HAWK_EMBEDDING_MODEL": "embedding_model",
+        }
+        for env_key, config_key in env_mappings.items():
+            if env_key in os.environ:
+                self._config[config_key] = os.environ[env_key]
 
     def get(self, key: str, default=None):
         return self._config.get(key, default)

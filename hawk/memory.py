@@ -125,13 +125,14 @@ class MemoryManager:
             return 'long'
         elif access_count >= self.LAYER_THRESHOLDS['short'] or importance >= 0.6:
             return 'short'
+        elif importance < 0.3:
+            return 'archive'
         return 'working'
 
     def decay(self):
         """所有记忆衰减，更新层级， archive 超过180天删除"""
         now = time.time()
         changed = False
-        to_archive = []
         to_delete = []
 
         for m in self.memories.values():
@@ -143,11 +144,10 @@ class MemoryManager:
             days_idle = max(0, int(now - m.last_accessed) // 86400)
             m.importance *= (self.DECAY_RATE ** days_idle)
             changed = True
-            # 降级
-            if m.importance < 0.3 and m.layer != 'archive':
-                m.layer = 'archive'
-            elif m.importance < 0.5 and m.layer == 'short':
-                m.layer = 'working'
+            # 降级（通过 _compute_layer 统一判断）
+            new_layer = self._compute_layer(m.importance, m.access_count)
+            if self.LAYERS.index(new_layer) < self.LAYERS.index(m.layer):
+                m.layer = new_layer
 
         for id in to_delete:
             del self.memories[id]

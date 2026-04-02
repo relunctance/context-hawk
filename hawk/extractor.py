@@ -310,7 +310,9 @@ def extract_with_openclaw(prompt: str, api_key: str, model: str, base_url: str) 
     except ImportError:
         import urllib.request
         # Minimax uses anthropic endpoint for chat, not /chat/completions
-        chat_url = base_url.replace('/anthropic', '') + '/chat/completions'
+        # Strip /anthropic suffix if present (Minimax-specific), then use standard /chat/completions
+        base = base_url.rstrip('/').replace('/anthropic', '')
+        chat_url = base + '/chat/completions'
         data = json.dumps({
             "model": model,
             "messages": [
@@ -333,9 +335,8 @@ def extract_with_openclaw(prompt: str, api_key: str, model: str, base_url: str) 
             content = result["choices"][0]["message"]["content"]
             return parse_and_validate(content)
 
-    # For minimax, base_url should be https://api.minimaxi.com/anthropic
-    # OpenAI SDK needs base_url without /anthropic for chat completions
-    chat_base = base_url.replace('/anthropic', '')
+    # Strip /anthropic suffix if present (Minimax-specific), then use standard /chat/completions
+    chat_base = base_url.rstrip('/').replace('/anthropic', '')
     client = OpenAI(api_key=api_key, base_url=chat_base)
     response = client.chat.completions.create(
         model=model,
