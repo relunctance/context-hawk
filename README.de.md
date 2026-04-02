@@ -26,7 +26,63 @@ Die meisten KI-Agenten leiden an **Amnesie** — jede neue Sitzung beginnt bei N
 
 ---
 
-## ✨ 10 Kernfunktionen
+## ❌ Without vs ✅ With Context-Hawk (TODO: translate)
+
+| Scenario | ❌ Without Context-Hawk | ✅ With Context-Hawk |
+|----------|------------------------|---------------------|
+| **New session starts** | Blank — knows nothing about you | ✅ Injects relevant memories automatically |
+| **User repeats a preference** | "I told you before..." | Remembers from day 1 |
+| **Long task runs for days** | Restart = start over | Task state persists via `hawk resume` |
+| **Context gets large** | Token bill skyrockets | 5 compression strategies keep it lean |
+| **Duplicate info** | Same fact stored 10 times | SimHash dedup — stored once |
+| **Memory recall** | All similar, redundant injection | MMR diverse recall — no repetition |
+| **Memory management** | Everything piles up forever | 4-tier decay — noise fades, signal stays |
+| **Self-improvement** | Repeats the same mistakes | importance + access_count tracking → smart promotion |
+| **Multi-agent team** | Each agent starts fresh | Shared memory via LanceDB |
+
+---
+
+## 😰 Pain Points & Solutions (TODO: translate)
+
+| Pain Point | Impact | Context-Hawk Solution |
+|------------|--------|----------------------|
+| AI forgets every session | Users repeat themselves | 4-tier memory decay |
+| Long tasks lost on restart | Work wasted | `hawk resume` |
+| Context overflow | Token costs spike | 5 injection + 5 compression strategies |
+| Memory noise | Important info buried | AI importance scoring |
+| Preferences ignored | User re-explains rules | importance ≥ 0.9 = permanent |
+
+---
+
+## 🎯 5 Core Problems (TODO: translate)
+
+**Problem 1: Session context window limits**
+Context has token limit (e.g. 32k). Long history crowds out important content.
+→ Context-Hawk compresses/archives, injects only the most relevant.
+
+**Problem 2: AI forgets across sessions**
+Session ends → context disappears. Next conversation starts fresh.
+→ `hawk recall` retrieves relevant memories for the next session.
+
+**Problem 3: Multiple agents share nothing**
+Agent A doesn't know Agent B's context.
+→ Shared LanceDB (with hawk-bridge): all agents read/write the same store.
+
+**Problem 4: Context grows too large before LLM**
+Recall without optimization = large, repetitive context.
+→ Compression + SimHash dedup + MMR: context is much smaller before LLM.
+
+**Problem 5: Memory never self-manages**
+No management: messages pile up until overflow.
+→ Auto-extraction → importance scoring → 4-tier decay.
+
+---
+
+## ✨ 12 Kernfunktionen
+
+---
+
+## ✨ 12 Kernfunktionen
 
 | # | Funktion | Beschreibung |
 |---|---------|-------|
@@ -40,6 +96,8 @@ Die meisten KI-Agenten leiden an **Amnesie** — jede neue Sitzung beginnt bei N
 | 8 | **LanceDB-Vektorsuche** | Optional — hybride Vektor + BM25-Suche |
 | 9 | **Reines Gedächtnis-Fallback** | Funktioniert ohne LanceDB, JSONL-Datei-Persistenz |
 | 10 | **Auto-Deduplizierung** | Führt doppelte Erinnerungen automatisch zusammen |
+| 11 | **MMR-Abruf** | Maximale Randrelevanz — vielfältiger Abruf, keine Wiederholung |
+| 12 | **6-Kategorie-Extraktion** | KI-gestützte Kategorisierung: Tatsache / Präferenz / Entscheidung / Entität / Aufgabe / Sonstiges |
 
 ---
 
@@ -235,11 +293,15 @@ context-hawk/
 
 ## Technische Daten
 
-- **Persistenz**: JSONL lokale Dateien, keine Datenbank erforderlich
-- **Vektorsuche**: LanceDB (optional), automatisches Fallback auf Dateien
-- **Cross-Agent**: Universell, keine Geschäftslogik, funktioniert mit jedem KI-Agenten
-- **Null-Konfiguration**: Sofort einsatzbereit mit intelligenten Standardwerten
-- **Erweiterbar**: Benutzerdefinierte Injektionsstrategien, Kompressionsrichtlinien, Bewertungsregeln
+| | |
+|---|---|
+| **Persistenz** | JSONL lokale Dateien, keine Datenbank erforderlich |
+| **Vektorsuche** | LanceDB (optional) + sentence-transformers local embedding, automatisches Fallback auf Dateien |
+| **Suche** | BM25 + ANN Vektorsuche + RRF-Fusion |
+| **Embedding-Anbieter** | Ollama / sentence-transformers / Jina AI / Minimax / OpenAI |
+| **Cross-Agent** | Universell, keine Geschäftslogik, funktioniert mit jedem KI-Agenten |
+| **Null-Konfiguration** | Sofort einsatzbereit mit intelligenten Standardwerten (BM25-only Modus) |
+| **Python** | 3.12+ |
 
 ---
 

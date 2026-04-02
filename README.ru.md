@@ -26,7 +26,27 @@
 
 ---
 
-## ✨ 10 основных функций
+## ❌ Without vs ✅ With Context-Hawk (TODO: translate)
+
+| Scenario | ❌ Without Context-Hawk | ✅ With Context-Hawk |
+|----------|------------------------|---------------------|
+| **New session starts** | Blank — knows nothing about you | ✅ Injects relevant memories automatically |
+| **User repeats a preference** | "I told you before..." | Remembers from day 1 |
+| **Long task runs for days** | Restart = start over | Task state persists via `hawk resume` |
+| **Context gets large** | Token bill skyrockets | 5 compression strategies keep it lean |
+| **Duplicate info** | Same fact stored 10 times | SimHash dedup — stored once |
+| **Memory recall** | All similar, redundant injection | MMR diverse recall — no repetition |
+| **Memory management** | Everything piles up forever | 4-tier decay — noise fades, signal stays |
+| **Self-improvement** | Repeats the same mistakes | importance + access_count tracking → smart promotion |
+| **Multi-agent team** | Each agent starts fresh | Shared memory via LanceDB |
+
+---
+
+## ✨ 12 основных функций
+
+---
+
+## ✨ 12 основных функций
 
 | # | Функция | Описание |
 |---|---------|-------|
@@ -40,6 +60,8 @@
 | 8 | **Векторный поиск LanceDB** | Опционально — гибридный vector + BM25 поиск |
 | 9 | **Чистый memory fallback** | Работает без LanceDB, персистенция через JSONL |
 | 10 | **Автодедупликация** | Автоматически объединяет повторяющиеся воспоминания |
+| 11 | **MMR Recall** | Maximal Marginal Relevance — diverse recall, no repetition |
+| 12 | **6-Category Extraction** | LLM-powered: fact / preference / decision / entity / task / other |
 
 ---
 
@@ -208,11 +230,15 @@ context-hawk/
 
 ## Технические характеристики
 
-- **Персистенция**: Локальные JSONL-файлы, без базы данных
-- **Векторный поиск**: LanceDB (опционально), автофоллбэк на файлы
-- **Cross-Agent**: Универсальный, без бизнес-логики, работает с любым AI-агентом
-- **Нулевая конфигурация**: Работает из коробки с умными значениями по умолчанию
-- **Расширяемый**: Пользовательские стратегии внедрения, политики сжатия, правила оценки
+| | |
+|---|---|
+| **Персистенция** | Локальные JSONL-файлы, без базы данных |
+| **Векторный поиск** | LanceDB (опционально) + sentence-transformers локальное встраивание, автофоллбэк на файлы |
+| **Поиск** | BM25 + ANN векторный поиск + RRF фьюжн |
+| **Провайдеры Embedding** | Ollama / sentence-transformers / Jina AI / Minimax / OpenAI |
+| **Cross-Agent** | Универсальный, без бизнес-логики, работает с любым AI-агентом |
+| **Нулевая конфигурация** | Работает из коробки (режим BM25-only) |
+| **Python** | 3.12+ |
 
 ---
 

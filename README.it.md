@@ -26,7 +26,27 @@ La maggior parte degli agenti IA soffre di **amnesia** — ogni nuova sessione p
 
 ---
 
-## ✨ 10 Funzionalità Principali
+## ❌ Without vs ✅ With Context-Hawk (TODO: translate)
+
+| Scenario | ❌ Without Context-Hawk | ✅ With Context-Hawk |
+|----------|------------------------|---------------------|
+| **New session starts** | Blank — knows nothing about you | ✅ Injects relevant memories automatically |
+| **User repeats a preference** | "I told you before..." | Remembers from day 1 |
+| **Long task runs for days** | Restart = start over | Task state persists via `hawk resume` |
+| **Context gets large** | Token bill skyrockets | 5 compression strategies keep it lean |
+| **Duplicate info** | Same fact stored 10 times | SimHash dedup — stored once |
+| **Memory recall** | All similar, redundant injection | MMR diverse recall — no repetition |
+| **Memory management** | Everything piles up forever | 4-tier decay — noise fades, signal stays |
+| **Self-improvement** | Repeats the same mistakes | importance + access_count tracking → smart promotion |
+| **Multi-agent team** | Each agent starts fresh | Shared memory via LanceDB |
+
+---
+
+## ✨ 12 Funzionalità Principali
+
+---
+
+## ✨ 12 Funzionalità Principali
 
 | # | Funzionalità | Descrizione |
 |---|---------|-------|
@@ -40,6 +60,8 @@ La maggior parte degli agenti IA soffre di **amnesia** — ogni nuova sessione p
 | 8 | **Ricerca Vettoriale LanceDB** | Opzionale — ricerca ibrida vettoriale + BM25 |
 | 9 | **Fallback Memoria Pura** | Funziona senza LanceDB, persistenza JSONL |
 | 10 | **Auto-Deduplicazione** | Unisce automaticamente i ricordi duplicati |
+| 11 | **MMR Recall** | Maximal Marginal Relevance — diverse recall, no repetition |
+| 12 | **6-Category Extraction** | LLM-powered: fact / preference / decision / entity / task / other |
 
 ---
 
@@ -208,11 +230,15 @@ context-hawk/
 
 ## Specifiche Tecniche
 
-- **Persistenza**: File JSONL locali, nessun database richiesto
-- **Ricerca vettoriale**: LanceDB (opzionale), fallback automatico su file
-- **Cross-Agent**: Universale, nessuna logica di business, funziona con qualsiasi agente IA
-- **Zero-Config**: Funziona out-of-the-box con valori predefiniti intelligenti
-- **Estendibile**: Strategie di iniezione personalizzate, politiche di compressione, regole di scoring
+| | |
+|---|---|
+| **Persistenza** | File JSONL locali, nessun database richiesto |
+| **Ricerca vettoriale** | LanceDB (opzionale) + sentence-transformers embedding locale, fallback automatico su file |
+| **Ricerca** | BM25 + ricerca vettoriale ANN + fusione RRF |
+| **Provider di Embedding** | Ollama / sentence-transformers / Jina AI / Minimax / OpenAI |
+| **Cross-Agent** | Universale, nessuna logica di business, funziona con qualsiasi agente IA |
+| **Zero-Config** | Funziona out-of-the-box (modalità BM25-only) |
+| **Python** | 3.12+ |
 
 ---
 
