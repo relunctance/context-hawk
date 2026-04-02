@@ -133,8 +133,18 @@ class VectorRetriever:
         vectors = self._get_embedding([query])
         vector = vectors[0]
 
-        # 2. LanceDB ANN 检索
-        results = table.search(vector).limit(self.top_k).to_list()
+        # 2. LanceDB ANN 检索 (wrap in try/except for dimension mismatch)
+        try:
+            results = table.search(vector).limit(self.top_k).to_list()
+        except RuntimeError as e:
+            if 'dim' in str(e).lower():
+                raise RuntimeError(
+                    f"Embedding dimension mismatch: your embedding model output ({len(vector)} dims) "
+                    f"does not match the LanceDB column dimension. "
+                    f"Set the correct HAWK_EMBEDDING_DIMENSIONS or EMBEDDING_DIMENSIONS in ~/.hawk/config.json. "
+                    f"Original error: {e}"
+                )
+            raise
 
         # 3. 过滤低分结果
         chunks = []

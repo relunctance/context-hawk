@@ -30,20 +30,38 @@ class Governance:
     Tracks metrics and writes JSONL logs.
     """
 
+    MAX_LOG_SIZE_MB = 10  # Rotate when governance.log exceeds this size
+
     def __init__(self, log_path: str = "~/.hawk/governance.log"):
         self.log_path = os.path.expanduser(log_path)
         os.makedirs(os.path.dirname(self.log_path), exist_ok=True)
 
     def log(self, event_type: str, count: int = 1, details: dict = None):
-        """Append a governance event"""
+        """Append a governance event; auto-rotates if log exceeds MAX_LOG_SIZE_MB"""
         event = GovernanceEvent(
             timestamp=int(time.time()),
             event_type=event_type,
             count=count,
             details=details or {},
         )
+        self._maybe_rotate()
         with open(self.log_path, 'a') as f:
             f.write(json.dumps(asdict(event), ensure_ascii=False) + '\n')
+
+    def _maybe_rotate(self):
+        """Rotate log if it exceeds MAX_LOG_SIZE_MB (keeps the newer half)"""
+        if not os.path.exists(self.log_path):
+            return
+        size_mb = os.path.getsize(self.log_path) / (1024 * 1024)
+        if size_mb <= self.MAX_LOG_SIZE_MB:
+            return
+        # Keep the newer half of the log
+        with open(self.log_path) as f:
+            lines = f.readlines()
+        half = len(lines) // 2
+        with open(self.log_path, 'w') as f:
+            f.writelines(lines[half:])
+
 
     def log_extraction(self, total: int, stored: int, skipped: int):
         """Log memory extraction results"""

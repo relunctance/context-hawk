@@ -150,19 +150,34 @@ class Config:
     def _load(self):
         # 配置文件（用户配置优先于默认值）
         if os.path.exists(self.config_path):
-            with open(self.config_path) as f:
-                user_config = json.load(f)
-                self._config.update(user_config)
+            try:
+                with open(self.config_path) as f:
+                    user_config = json.load(f)
+                    self._config.update(user_config)
+            except (json.JSONDecodeError, IOError, UnicodeDecodeError) as e:
+                print(f"[Config] Warning: failed to load {self.config_path}: {e}. Using defaults.")
 
         # 环境变量覆盖（最高优先级）
-        env_mappings = {
-            "OPENAI_API_KEY": "openai_api_key",
-            "HAWK_DB_PATH": "db_path",
-            "HAWK_EMBEDDING_MODEL": "embedding_model",
-        }
-        for env_key, config_key in env_mappings.items():
-            if env_key in os.environ:
-                self._config[config_key] = os.environ[env_key]
+        # Generic: any HAWK_* env var overrides the matching underscore-key in config.
+        # e.g. HAWK_DECAY_RATE=0.9 → config['decay_rate'] = 0.9
+        # Type coercion: try int/float, otherwise keep as string.
+        _int_keys = {'recall_top_k', 'capture_max_chunks', 'working_ttl_days', 'short_ttl_days',
+                     'long_ttl_days', 'archive_ttl_days', 'embedding_dimensions'}
+        _float_keys = {'decay_rate', 'recall_min_score', 'capture_importance_threshold',
+                       'importance_threshold_low', 'importance_threshold_high', 'compress_ratio_threshold',
+                       'summary_max_chars', 'embedding_dimensions'}
+        for env_key in os.environ:
+            if env_key.startswith('HAWK_'):
+                config_key = env_key[len('HAWK_'):].lower()
+                if config_key and config_key in self._config:
+                    val = os.environ[env_key]
+                    if config_key in _int_keys:
+                        try: val = int(val)
+                        except ValueError: pass
+                    elif config_key in _float_keys:
+                        try: val = float(val)
+                        except ValueError: pass
+                    self._config[config_key] = val
 
     def get(self, key: str, default=None):
         return self._config.get(key, default)
