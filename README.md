@@ -26,6 +26,20 @@ Most AI agents suffer from **amnesia** — every new session starts from zero. C
 
 ---
 
+## 😰 Pain Points & Solutions
+
+| Pain Point | Impact | Context-Hawk Solution |
+|------------|--------|----------------------|
+| **AI forgets everything each session** | Users repeat themselves constantly | 4-tier memory decay — important stuff persists |
+| **Long-running tasks lost on restart** | Work wasted, context gone | `hawk resume` — task state survives restarts |
+| **Context window overflow** | Expensive tokens, slow responses | 5 injection strategies + 5 compression strategies |
+| **Memory noise** | Important info buried in chat history | AI importance scoring — auto-discard low-value content |
+| **Preferences ignored** | User has to re-explain rules every time | Importance ≥ 0.9 = permanent memory |
+
+**The core value:** Context-Hawk gives your AI agent a memory that actually works — not just storing everything, but intelligently retaining what matters and letting go of what doesn't.
+
+---
+
 ## ✨ 10 Core Features
 
 | # | Feature | Description |
