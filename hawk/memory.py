@@ -102,8 +102,10 @@ class MemoryManager:
             json.dump({k: asdict(v) for k, v in self.memories.items()}, f, ensure_ascii=False)
 
     def store(self, text: str, category: str = "other", importance: float = 0.5, metadata: dict = None) -> str:
-        """存入记忆，自动判断层级"""
+        """存入记忆，自动判断层级（normalize 清理后入库）"""
+        from hawk.normalize import normalize
         import hashlib
+        text = normalize(text)
         with self._lock:
             id = hashlib.sha256(f"{text[:100]}{time.time()}".encode()).hexdigest()[:16]
             now = time.time()
