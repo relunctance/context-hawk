@@ -240,6 +240,7 @@ def extract_with_openai(prompt: str, api_key: str, model: str) -> list[Extracted
         ],
         temperature=EXTRACTION_TEMPERATURE,
         max_tokens=2000,
+        response_format={"type": "json_object"},
     )
     return parse_and_validate(response.choices[0].message.content)
 
@@ -259,6 +260,7 @@ def extract_with_groq(prompt: str, api_key: str, model: str) -> list[ExtractedMe
             ],
             "temperature": EXTRACTION_TEMPERATURE,
             "max_tokens": 2000,
+            "response_format": {"type": "json_object"},
         }).encode()
         req = urllib.request.Request(
             "https://api.groq.com/openai/v1/chat/completions",
@@ -282,6 +284,7 @@ def extract_with_groq(prompt: str, api_key: str, model: str) -> list[ExtractedMe
         ],
         temperature=EXTRACTION_TEMPERATURE,
         max_tokens=2000,
+        response_format={"type": "json_object"},
     )
     return parse_and_validate(response.choices[0].message.content)
 
@@ -354,6 +357,7 @@ def extract_with_openclaw(prompt: str, api_key: str, model: str, base_url: str) 
             ],
             "temperature": EXTRACTION_TEMPERATURE,
             "max_tokens": 2000,
+            "response_format": {"type": "json_object"},
         }).encode()
         req = urllib.request.Request(
             chat_url,
@@ -379,6 +383,7 @@ def extract_with_openclaw(prompt: str, api_key: str, model: str, base_url: str) 
         ],
         temperature=EXTRACTION_TEMPERATURE,
         max_tokens=2000,
+        response_format={"type": "json_object"},
     )
     return parse_and_validate(response.choices[0].message.content)
 
