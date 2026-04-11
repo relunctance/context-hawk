@@ -48,6 +48,8 @@ Range: 0.0–1.0. Default 0.7.
 
 class ExtractedMemory(TypedDict):
     text: str
+    name: str          # 10-30 chars, auto-generated short title
+    description: str   # ~50 chars, brief description
     category: str
     importance: float
     abstract: str
@@ -67,6 +69,8 @@ EXTRACTION_PROMPT = """你是一个记忆提取引擎。从以下对话内容中
 - 只输出真正重要的信息，单条不超过200字
 - 忽略寒暄、问候、确认类内容
 - importance 0.0-1.0，表示这条记忆的重要程度
+- name: 10-30字符的短标题，概括记忆内容（中英文均可）
+- description: 约50字符的简要描述
 - abstract: 一句话概括
 - overview: 结构化摘要
 
@@ -77,7 +81,7 @@ EXTRACTION_PROMPT = """你是一个记忆提取引擎。从以下对话内容中
 {format_example}"""
 
 FORMAT_EXAMPLE = json.dumps([
-    {"text": "示例记忆", "category": "fact", "importance": 0.8, "abstract": "一句话", "overview": "结构化摘要"}
+    {"text": "示例记忆内容", "name": "示例记忆标题", "description": "这是一个示例描述", "category": "fact", "importance": 0.8, "abstract": "一句话", "overview": "结构化摘要"}
 ])
 
 
@@ -412,6 +416,8 @@ def parse_and_validate(content: str) -> list[ExtractedMemory]:
             cat = "other"
         validated.append({
             "text": m["text"][:500],
+            "name": m.get("name", "")[:30] or m["text"][:20],
+            "description": m.get("description", "")[:50] or m.get("abstract", "")[:50],
             "category": cat,
             "importance": min(1.0, max(0.0, float(m.get("importance", 0.5)))),
             "abstract": m.get("abstract", "")[:100],
